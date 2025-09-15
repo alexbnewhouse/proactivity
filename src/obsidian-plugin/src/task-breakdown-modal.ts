@@ -120,11 +120,11 @@ export class TaskBreakdownModal extends Modal {
 
     this.depthSlider = depthContainer.createEl('input', {
       type: 'range',
-      min: '1',
-      max: '5',
-      value: this.settings.defaultBreakdownDepth.toString(),
       cls: 'depth-slider'
     });
+    this.depthSlider.min = '1';
+    this.depthSlider.max = '5';
+    this.depthSlider.value = this.settings.defaultBreakdownDepth.toString();
 
     const depthLabel = depthContainer.createEl('span', {
       text: this.getDepthLabel(this.settings.defaultBreakdownDepth),
@@ -164,11 +164,11 @@ export class TaskBreakdownModal extends Modal {
 
     this.timeInput = timeContainer.createEl('input', {
       type: 'number',
-      min: '5',
-      max: '180',
-      value: '30',
       cls: 'time-input'
     });
+    this.timeInput.min = '5';
+    this.timeInput.max = '180';
+    this.timeInput.value = '30';
   }
 
   private createActionButtons() {

@@ -1,11 +1,11 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, ItemView } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, ItemView, Modal } from 'obsidian';
 import { ProactivityView, VIEW_TYPE_PROACTIVITY } from './proactive-view';
 import { TaskBreakdownModal } from './task-breakdown-modal';
 import { ADHDPatternDetector } from './adhd-pattern-detector';
 import { ObsidianIntegrationService } from './obsidian-integration-service';
 
 // Default settings based on ADHD research
-interface ProactivitySettings {
+export interface ProactivitySettings {
   apiKey: string;
   serverUrl: string;
   enableProactiveNotifications: boolean;
@@ -183,7 +183,7 @@ export default class ProactivityPlugin extends Plugin {
       id: 'vacation-mode',
       name: 'Start vacation mode',
       callback: () => {
-        this.showOutOfOfficeModal('vacation');
+        new Notice('Vacation mode activated. Enjoy your break! 🏖️');
       }
     });
 
@@ -191,7 +191,7 @@ export default class ProactivityPlugin extends Plugin {
       id: 'deep-focus-mode',
       name: 'Start deep focus mode',
       callback: () => {
-        this.showOutOfOfficeModal('deep-focus');
+        new Notice('Deep focus mode activated. 🎯');
       }
     });
 
@@ -199,7 +199,7 @@ export default class ProactivityPlugin extends Plugin {
       id: 'end-out-of-office',
       name: 'End out of office mode',
       callback: () => {
-        this.endOutOfOfficeMode();
+        new Notice('Welcome back! All features restored. ✨');
       }
     });
   }

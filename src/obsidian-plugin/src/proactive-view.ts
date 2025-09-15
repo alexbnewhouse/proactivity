@@ -34,7 +34,7 @@ export class ProactivityView extends ItemView {
   }
 
   async onOpen() {
-    const container = this.containerEl.children[1];
+    const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass('proactivity-view');
 

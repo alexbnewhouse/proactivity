@@ -1,4 +1,4 @@
-import { App, TFile, Notice, MetadataCache, MarkdownView } from 'obsidian';
+import { App, TFile, Notice, MetadataCache, MarkdownView, TFolder } from 'obsidian';
 import { ProactivitySettings } from './main';
 
 /**
@@ -434,7 +434,7 @@ ${this.settings.obsidianIntegration.taskTagPrefix}/daily-note
     const dissertationPath = this.settings.obsidianIntegration.dissertationFolderPath;
     const folder = this.app.vault.getAbstractFileByPath(dissertationPath);
 
-    if (!folder || folder.children === undefined) return [];
+    if (!folder || !(folder instanceof TFolder)) return [];
 
     return folder.children.filter(file => file instanceof TFile && file.extension === 'md') as TFile[];
   }
