@@ -7,7 +7,13 @@ import { TaskComplexity, EnergyLevel, ExecutiveFunction, TaskCategory } from '..
  */
 class TaskBreakdownService {
   constructor(apiKey) {
-    this.openai = new OpenAI({ apiKey });
+    // Only initialize OpenAI if API key is provided
+    if (apiKey && apiKey.trim()) {
+      this.openai = new OpenAI({ apiKey });
+    } else {
+      console.warn('⚠️  OpenAI API key not provided. Task breakdown will use fallback mode only.');
+      this.openai = null;
+    }
     this.model = process.env.OPENAI_MODEL || 'gpt-4-turbo-preview';
   }
 
@@ -34,6 +40,12 @@ class TaskBreakdownService {
       executiveFunctionChallenges,
       currentProject
     );
+
+    // Use fallback if OpenAI is not available
+    if (!this.openai) {
+      console.log('Using fallback task breakdown (no OpenAI API key)');
+      return this.fallbackBreakdown(originalTask, context);
+    }
 
     try {
       const completion = await this.openai.chat.completions.create({
