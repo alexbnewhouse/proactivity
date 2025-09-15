@@ -23,11 +23,10 @@ import ADHDPatternService from './services/adhdPatternService.js';
 import ProactiveNotificationService from './services/proactiveNotificationService.js';
 import OutOfOfficeService from './services/outOfOfficeService.js';
 
-// Initialize dotenv
-dotenv.config();
-
+// Initialize dotenv with path to root .env file
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '../../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
