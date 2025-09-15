@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 
 /**
- * Out of Office Service for ProActive PhD
+ * Out of Office Service for Proactivity
  * Manages vacation/break modes to pause proactive features
  * Provides hooks for easy integration across all services
  */
@@ -253,7 +253,7 @@ class OutOfOfficeService extends EventEmitter {
     if (!this.isOutOfOffice) {
       return {
         active: false,
-        message: 'ProActive PhD is fully operational'
+        message: 'Proactivity is fully operational'
       };
     }
 

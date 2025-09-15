@@ -1,4 +1,4 @@
-// Shared type definitions for ProActive PhD
+// Shared type definitions for Proactivity
 
 /**
  * ADHD-specific task complexity levels

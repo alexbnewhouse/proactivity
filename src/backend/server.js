@@ -11,6 +11,7 @@ import patternRoutes from './routes/patternRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import obsidianRoutes from './routes/obsidianRoutes.js';
 import outOfOfficeRoutes from './routes/outOfOfficeRoutes.js';
+import docsRoutes from './routes/docsRoutes.js';
 
 // Import middleware
 import authMiddleware from './middleware/auth.js';
@@ -103,6 +104,7 @@ app.use('/api/patterns', patternRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/obsidian', obsidianRoutes);
 app.use('/api/out-of-office', outOfOfficeRoutes);
+app.use('/api/docs', docsRoutes);
 
 // Protected routes (require authentication)
 app.use('/api/protected/*', authMiddleware);
@@ -130,7 +132,7 @@ app.use('*', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 ProActive PhD Server running on port ${PORT}`);
+  console.log(`🚀 Proactivity Server running on port ${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
   console.log(`🧠 AI Task Breakdown: ${taskBreakdownService ? '✅' : '❌'}`);
   console.log(`📊 Pattern Detection: ${patternService ? '✅' : '❌'}`);

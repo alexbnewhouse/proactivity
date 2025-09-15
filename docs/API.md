@@ -1,8 +1,8 @@
-# ProActive PhD API Documentation
+# Proactivity API Documentation
 
 ## Overview
 
-The ProActive PhD backend provides RESTful APIs for AI-powered task breakdown, ADHD pattern detection, proactive notifications, and out-of-office management.
+The Proactivity backend provides RESTful APIs for AI-powered task breakdown, ADHD pattern detection, proactive notifications, and out-of-office management.
 
 **Base URL**: `http://localhost:3001/api`
 
@@ -303,9 +303,9 @@ The API supports webhooks for real-time pattern detection and intervention:
 ### JavaScript/Node.js
 
 ```javascript
-import ProActivePhdAPI from 'proactive-phd-sdk';
+import ProactivityAPI from 'proactivity-sdk';
 
-const api = new ProActivePhdAPI('http://localhost:3001');
+const api = new ProactivityAPI('http://localhost:3001');
 
 // Break down a task
 const breakdown = await api.tasks.breakdown(
@@ -328,9 +328,9 @@ api.patterns.on('procrastination', (data) => {
 ### Python
 
 ```python
-from proactive_phd import ProActivePhdAPI
+from proactivity import ProactivityAPI
 
-api = ProActivePhdAPI('http://localhost:3001')
+api = ProactivityAPI('http://localhost:3001')
 
 # Break down a task
 breakdown = api.tasks.breakdown(

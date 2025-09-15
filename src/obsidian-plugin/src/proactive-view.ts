@@ -1,11 +1,11 @@
-import { ItemView, WorkspaceLeaf, Setting } from 'obsidian';
-import { ProActivePhdSettings } from './main';
+import { ItemView, WorkspaceLeaf, Setting, Modal, App, Notice } from 'obsidian';
+import { ProactivitySettings } from './main';
 import { ObsidianIntegrationService } from './obsidian-integration-service';
 
-export const VIEW_TYPE_PROACTIVE_PHD = 'proactive-phd-view';
+export const VIEW_TYPE_PROACTIVITY = 'proactivity-view';
 
-export class ProActivePhdView extends ItemView {
-  private settings: ProActivePhdSettings;
+export class ProactivityView extends ItemView {
+  private settings: ProactivitySettings;
   private integrationService: ObsidianIntegrationService;
   private currentEnergyLevel: string = 'moderate';
   private todaysTasks: any[] = [];
@@ -13,7 +13,7 @@ export class ProActivePhdView extends ItemView {
 
   constructor(
     leaf: WorkspaceLeaf,
-    settings: ProActivePhdSettings,
+    settings: ProactivitySettings,
     integrationService: ObsidianIntegrationService
   ) {
     super(leaf);
@@ -22,11 +22,11 @@ export class ProActivePhdView extends ItemView {
   }
 
   getViewType() {
-    return VIEW_TYPE_PROACTIVE_PHD;
+    return VIEW_TYPE_PROACTIVITY;
   }
 
   getDisplayText() {
-    return 'ProActive PhD';
+    return 'Proactivity';
   }
 
   getIcon() {
@@ -36,7 +36,7 @@ export class ProActivePhdView extends ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass('proactive-phd-view');
+    container.addClass('proactivity-view');
 
     this.renderMainInterface(container);
     await this.loadTodaysTasks();
@@ -49,7 +49,7 @@ export class ProActivePhdView extends ItemView {
   private renderMainInterface(container: HTMLElement) {
     // Header with status
     const header = container.createEl('div', { cls: 'proactive-header' });
-    const title = header.createEl('h2', { text: 'ProActive PhD Assistant' });
+    const title = header.createEl('h2', { text: 'Proactivity Assistant' });
 
     // Energy Level Section
     this.renderEnergySection(container);

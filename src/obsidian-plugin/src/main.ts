@@ -1,11 +1,11 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, ItemView } from 'obsidian';
-import { ProActivePhdView, VIEW_TYPE_PROACTIVE_PHD } from './proactive-view';
+import { ProactivityView, VIEW_TYPE_PROACTIVITY } from './proactive-view';
 import { TaskBreakdownModal } from './task-breakdown-modal';
 import { ADHDPatternDetector } from './adhd-pattern-detector';
 import { ObsidianIntegrationService } from './obsidian-integration-service';
 
 // Default settings based on ADHD research
-interface ProActivePhdSettings {
+interface ProactivitySettings {
   apiKey: string;
   serverUrl: string;
   enableProactiveNotifications: boolean;
@@ -32,7 +32,7 @@ interface ProActivePhdSettings {
   };
 }
 
-const DEFAULT_SETTINGS: ProActivePhdSettings = {
+const DEFAULT_SETTINGS: ProactivitySettings = {
   apiKey: '',
   serverUrl: 'http://localhost:3001',
   enableProactiveNotifications: true,
@@ -48,7 +48,7 @@ const DEFAULT_SETTINGS: ProActivePhdSettings = {
     enableSmartLinking: true,
     dissertationFolderPath: 'Dissertation',
     dailyNotePath: 'Daily Notes',
-    taskTagPrefix: '#proactive-phd'
+    taskTagPrefix: '#proactivity'
   },
   adhdSupport: {
     useGentleTone: true,
@@ -59,8 +59,8 @@ const DEFAULT_SETTINGS: ProActivePhdSettings = {
   }
 };
 
-export default class ProActivePhdPlugin extends Plugin {
-  settings: ProActivePhdSettings;
+export default class ProactivityPlugin extends Plugin {
+  settings: ProactivitySettings;
   patternDetector: ADHDPatternDetector;
   integrationService: ObsidianIntegrationService;
   private statusBarItem: HTMLElement;
@@ -75,12 +75,12 @@ export default class ProActivePhdPlugin extends Plugin {
 
     // Register view for main interface
     this.registerView(
-      VIEW_TYPE_PROACTIVE_PHD,
-      (leaf) => new ProActivePhdView(leaf, this.settings, this.integrationService)
+      VIEW_TYPE_PROACTIVITY,
+      (leaf) => new ProactivityView(leaf, this.settings, this.integrationService)
     );
 
     // Add ribbon icon for quick access
-    this.addRibbonIcon('brain-circuit', 'ProActive PhD', () => {
+    this.addRibbonIcon('brain-circuit', 'Proactivity', () => {
       this.activateView();
     });
 
@@ -102,9 +102,9 @@ export default class ProActivePhdPlugin extends Plugin {
     }
 
     // Add settings tab
-    this.addSettingTab(new ProActivePhdSettingTab(this.app, this));
+    this.addSettingTab(new ProactivitySettingTab(this.app, this));
 
-    new Notice('ProActive PhD: Your ADHD-friendly dissertation assistant is ready!');
+    new Notice('Proactivity: Your ADHD-friendly dissertation assistant is ready!');
   }
 
   onunload() {
@@ -208,7 +208,7 @@ export default class ProActivePhdPlugin extends Plugin {
     const { workspace } = this.app;
 
     let leaf: WorkspaceLeaf | null = null;
-    const leaves = workspace.getLeavesOfType(VIEW_TYPE_PROACTIVE_PHD);
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_PROACTIVITY);
 
     if (leaves.length > 0) {
       // If a view already exists, use it
@@ -216,7 +216,7 @@ export default class ProActivePhdPlugin extends Plugin {
     } else {
       // Otherwise create a new one in the right sidebar
       leaf = workspace.getRightLeaf(false);
-      await leaf?.setViewState({ type: VIEW_TYPE_PROACTIVE_PHD, active: true });
+      await leaf?.setViewState({ type: VIEW_TYPE_PROACTIVITY, active: true });
     }
 
     if (leaf) {
@@ -237,7 +237,7 @@ export default class ProActivePhdPlugin extends Plugin {
   showEnergyCheckModal() {
     // Create a simple modal for energy level assessment
     const modal = new class extends Modal {
-      constructor(app: App, private plugin: ProActivePhdPlugin) {
+      constructor(app: App, private plugin: ProactivityPlugin) {
         super(app);
       }
 
@@ -415,15 +415,15 @@ export default class ProActivePhdPlugin extends Plugin {
   }
 
   updateStatusBar(status: string) {
-    this.statusBarItem.setText(`ProActive: ${status}`);
+    this.statusBarItem.setText(`Proactivity: ${status}`);
   }
 }
 
 // Settings tab
-class ProActivePhdSettingTab extends PluginSettingTab {
-  plugin: ProActivePhdPlugin;
+class ProactivitySettingTab extends PluginSettingTab {
+  plugin: ProactivityPlugin;
 
-  constructor(app: App, plugin: ProActivePhdPlugin) {
+  constructor(app: App, plugin: ProactivityPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -432,7 +432,7 @@ class ProActivePhdSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h2', { text: 'ProActive PhD Settings' });
+    containerEl.createEl('h2', { text: 'Proactivity Settings' });
 
     // API Configuration
     containerEl.createEl('h3', { text: 'API Configuration' });
@@ -450,7 +450,7 @@ class ProActivePhdSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Server URL')
-      .setDesc('ProActive PhD backend server URL')
+      .setDesc('Proactivity backend server URL')
       .addText(text => text
         .setPlaceholder('http://localhost:3001')
         .setValue(this.plugin.settings.serverUrl)

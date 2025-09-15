@@ -5,7 +5,7 @@ import { NotificationUrgency, EnergyLevel, ADHDPattern } from '../../shared/type
  * Proactive notification service specifically designed for ADHD users
  * Based on research showing ADHD brains benefit from external structure and gentle prompting
  */
-class ProactiveNotificationService {
+class ProactivityNotificationService {
   constructor(patternService, userPreferences = {}) {
     this.patternService = patternService;
     this.userPreferences = {
@@ -483,7 +483,7 @@ class ProactiveNotificationService {
 
   async deliverNotification(notification) {
     // Placeholder for actual delivery mechanism
-    console.log('📧 ProActive Notification:', notification);
+    console.log('📧 Proactivity Notification:', notification);
 
     return {
       success: true,
@@ -588,4 +588,4 @@ class ProactiveNotificationService {
   }
 }
 
-export default ProactiveNotificationService;
+export default ProactivityNotificationService;

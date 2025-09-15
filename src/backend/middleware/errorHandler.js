@@ -1,5 +1,5 @@
 /**
- * Centralized error handling middleware for ProActive PhD
+ * Centralized error handling middleware for Proactivity
  * Provides ADHD-friendly error messages and appropriate logging
  */
 

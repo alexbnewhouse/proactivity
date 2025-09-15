@@ -1,5 +1,5 @@
 /**
- * Authentication middleware for ProActive PhD
+ * Authentication middleware for Proactivity
  * Currently a placeholder for future authentication implementation
  */
 

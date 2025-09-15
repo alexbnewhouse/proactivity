@@ -1,0 +1,776 @@
+/* Proactivity Obsidian Plugin Styles */
+/* ADHD-friendly design with calming colors and clear visual hierarchy */
+
+/* Main Plugin View */
+.proactivity-view {
+  padding: 16px;
+  font-family: var(--font-interface);
+  color: var(--text-normal);
+  max-width: 100%;
+  overflow-y: auto;
+}
+
+/* Header */
+.proactive-header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.proactive-header h2 {
+  margin: 0 0 8px 0;
+  color: var(--text-accent);
+  font-size: 1.4em;
+}
+
+/* Section Styling */
+.energy-section,
+.focus-section,
+.tasks-section,
+.progress-section,
+.quick-actions-section,
+.adhd-support-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  border-left: 3px solid var(--interactive-accent);
+}
+
+.energy-section h3,
+.focus-section h3,
+.tasks-section h3,
+.progress-section h3,
+.quick-actions-section h3,
+.adhd-support-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.1em;
+  color: var(--text-accent);
+}
+
+/* Energy Level Buttons */
+.energy-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.energy-button {
+  flex: 1;
+  min-width: 100px;
+  padding: 12px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.9em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.energy-button:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.energy-button.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+/* Energy Recommendations */
+.energy-recommendations {
+  margin-top: 12px;
+}
+
+.energy-recommendation {
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: var(--background-primary);
+  border-radius: 4px;
+  font-size: 0.9em;
+  border-left: 3px solid var(--text-accent);
+}
+
+/* Focus Section */
+.focus-input {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.95em;
+}
+
+.focus-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+.focus-timer {
+  display: flex;
+  justify-content: center;
+}
+
+/* Task Suggestions */
+.tasks-container {
+  margin-bottom: 12px;
+}
+
+.task-item {
+  padding: 12px;
+  margin: 8px 0;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  transition: border-color 0.2s ease;
+}
+
+.task-item:hover {
+  border-color: var(--interactive-accent);
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.task-title {
+  font-weight: 600;
+  color: var(--text-normal);
+  flex: 1;
+}
+
+.task-time {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  background: var(--background-secondary);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.task-description {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin: 8px 0;
+  line-height: 1.4;
+}
+
+.task-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.task-start-btn,
+.task-breakdown-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.task-start-btn:hover,
+.task-breakdown-btn:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.refresh-tasks-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--interactive-accent);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-tasks-btn:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Progress Section */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--background-modifier-border);
+  border-radius: 4px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--interactive-accent), var(--interactive-accent-hover));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.progress-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 8px;
+  background: var(--background-primary);
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.celebrate-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ff6b6b, #ffa726);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.celebrate-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Quick Actions Grid */
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.action-button {
+  padding: 16px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.85em;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-button:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  transform: translateY(-2px);
+}
+
+/* ADHD Support Section */
+.patterns-display {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--background-primary);
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  font-size: 0.9em;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.support-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.support-tool-btn {
+  padding: 12px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.support-tool-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+/* Task Breakdown Modal */
+.proactive-task-breakdown-modal {
+  min-width: 600px;
+  max-width: 800px;
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.modal-header h2 {
+  margin: 0 0 8px 0;
+  color: var(--text-accent);
+}
+
+.modal-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.input-section {
+  margin-bottom: 20px;
+}
+
+.input-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.task-input,
+.context-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  resize: vertical;
+}
+
+.task-input:focus,
+.context-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+.context-input {
+  min-height: 80px;
+}
+
+/* Quick Suggestions */
+.quick-suggestions {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.quick-suggestions span {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.suggestion-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.suggestion-btn:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* Options Section */
+.options-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.option-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.depth-slider,
+.energy-select,
+.time-input {
+  padding: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.depth-label {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* Button Styles */
+.button-container {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.breakdown-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.breakdown-btn:hover {
+  background: var(--interactive-accent-hover);
+  transform: translateY(-1px);
+}
+
+.cancel-btn {
+  padding: 12px 24px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Breakdown Display */
+.breakdown-container {
+  margin-top: 24px;
+  min-height: 100px;
+}
+
+.breakdown-container.processing {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+.processing-message {
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 3px solid var(--background-modifier-border);
+  border-top: 3px solid var(--interactive-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.processing-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin: 8px 0 0 0;
+}
+
+/* Breakdown Results */
+.breakdown-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.breakdown-header h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-accent);
+}
+
+.motivation-message {
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.steps-list {
+  margin-bottom: 24px;
+}
+
+.breakdown-step {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  border-left: 4px solid var(--interactive-accent);
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 50%;
+  font-size: 0.8em;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-title {
+  flex: 1;
+  margin: 0;
+  font-size: 1em;
+  color: var(--text-normal);
+}
+
+.step-time {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  background: var(--background-primary);
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.step-description {
+  color: var(--text-muted);
+  margin: 8px 0;
+  line-height: 1.4;
+}
+
+.step-tips {
+  margin: 12px 0;
+  padding-left: 20px;
+}
+
+.step-tips li {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin: 4px 0;
+}
+
+.step-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.step-start-btn,
+.step-add-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.step-start-btn:hover,
+.step-add-btn:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.breakdown-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.secondary-btn {
+  padding: 10px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.secondary-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Error State */
+.error-message {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-error);
+}
+
+.retry-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border: 1px solid var(--text-error);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-error);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: var(--text-error);
+  color: var(--text-on-accent);
+}
+
+/* Breathing Exercise Modal */
+.breathing-instructions {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.breathing-pattern {
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+}
+
+.breathing-circle {
+  width: 100px;
+  height: 100px;
+  border: 3px solid var(--interactive-accent);
+  border-radius: 50%;
+  transition: transform 4s ease-in-out;
+  background: radial-gradient(circle, var(--interactive-accent-hover), transparent);
+}
+
+.breathing-circle.expand {
+  transform: scale(1.5);
+}
+
+.breathing-circle.contract {
+  transform: scale(0.8);
+}
+
+.breathing-instruction {
+  text-align: center;
+  font-size: 1.2em;
+  font-weight: 600;
+  color: var(--text-accent);
+  margin: 20px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .options-section {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .progress-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .button-container {
+    flex-direction: column;
+  }
+
+  .breakdown-footer {
+    flex-direction: column;
+  }
+}
+
+/* No tasks message */
+.no-tasks-message {
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 20px;
+}
+
+/* Status Bar */
+.status-bar-item.plugin-proactivity {
+  color: var(--text-accent);
+  font-weight: 500;
+}
+
+/* Accessibility */
+.energy-button:focus,
+.task-start-btn:focus,
+.task-breakdown-btn:focus,
+.action-button:focus,
+.support-tool-btn:focus {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .energy-button,
+  .task-item,
+  .action-button {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .energy-button,
+  .action-button,
+  .breakdown-btn,
+  .breathing-circle {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+}

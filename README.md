@@ -1,10 +1,10 @@
-# ProActive PhD
+# Proactivity
 
 A proactive AI assistant designed specifically for ADHD-focused dissertation writing, with deep Obsidian integration and cutting-edge productivity research implementation.
 
 ## Overview
 
-ProActive PhD leverages the latest research in ADHD cognitive behavioral interventions, AI-powered productivity assistance, and academic writing workflow optimization. Unlike traditional productivity apps that require users to remember to use them, ProActive PhD anticipates needs and intervenes proactively.
+Proactivity leverages the latest research in ADHD cognitive behavioral interventions, AI-powered productivity assistance, and academic writing workflow optimization. Unlike traditional productivity apps that require users to remember to use them, Proactivity anticipates needs and intervenes proactively.
 
 ## Key Features
 
@@ -82,17 +82,17 @@ The backend will be available at `http://localhost:3001`
 cd /path/to/your/vault/.obsidian/plugins/
 
 # Create plugin directory
-mkdir proactive-phd
+mkdir proactivity
 
 # Copy plugin files from this repository
-cp -r /path/to/proactivity/src/obsidian-plugin/* proactive-phd/
+cp -r /path/to/proactivity/src/obsidian-plugin/* proactivity/
 ```
 
 2. **Enable the Plugin**
 - Open Obsidian
 - Go to Settings → Community Plugins
 - Make sure "Safe mode" is OFF
-- Find "ProActive PhD" in the list and enable it
+- Find "Proactivity" in the list and enable it
 - Configure your settings (see Configuration section below)
 
 #### Method 2: Development Setup
@@ -106,7 +106,7 @@ cd src/obsidian-plugin
 npm run build
 
 # Create symbolic link to your vault
-ln -s "$(pwd)" "/path/to/your/vault/.obsidian/plugins/proactive-phd"
+ln -s "$(pwd)" "/path/to/your/vault/.obsidian/plugins/proactivity"
 ```
 
 2. **Hot Reload During Development**
@@ -156,7 +156,7 @@ After installing the plugin, configure it for optimal ADHD support:
 
 ### Out of Office Mode 🏖️
 
-ProActive PhD includes a sophisticated "out of office" system to pause proactive features when you need a break:
+Proactivity includes a sophisticated "out of office" system to pause proactive features when you need a break:
 
 #### Quick Modes
 - **Vacation Mode**: `Ctrl/Cmd + P` → "Start vacation mode"
@@ -278,4 +278,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-For support, questions, or feedback, please open an issue or contact our team at [support@proactivephd.com](mailto:support@proactivephd.com).
+For support, questions, or feedback, please open an issue or reach out through our GitHub repository.

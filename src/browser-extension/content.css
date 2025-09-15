@@ -1,0 +1,276 @@
+/* Proactivity Browser Extension - Content Styles */
+/* ADHD-friendly intervention styling */
+
+.proactivity-intervention {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 2147483647; /* Maximum z-index */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.proactivity-intervention.proactivity-visible {
+  opacity: 1;
+}
+
+.proactivity-intervention.proactivity-hiding {
+  opacity: 0;
+}
+
+.proactivity-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 480px;
+  min-width: 320px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  transform: translateY(20px);
+  transition: transform 0.3s ease;
+  position: relative;
+  color: #333;
+}
+
+.proactivity-intervention.proactivity-visible .proactivity-modal {
+  transform: translateY(0);
+}
+
+.proactivity-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.proactivity-modal h3 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.proactivity-modal p {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #4a5568;
+}
+
+.proactivity-modal p:last-of-type {
+  margin-bottom: 24px;
+}
+
+.proactivity-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.proactivity-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.proactivity-btn.primary {
+  background: #667eea;
+  color: white;
+}
+
+.proactivity-btn.primary:hover {
+  background: #5a67d8;
+  transform: translateY(-1px);
+}
+
+.proactivity-btn.secondary {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.proactivity-btn.secondary:hover {
+  background: #cbd5e0;
+}
+
+.proactivity-btn.tertiary {
+  background: transparent;
+  color: #718096;
+  border: 1px solid #e2e8f0;
+}
+
+.proactivity-btn.tertiary:hover {
+  background: #f7fafc;
+}
+
+/* Specific modal styling */
+.proactivity-modal.procrastination {
+  border-top: 4px solid #48bb78;
+}
+
+.proactivity-modal.procrastination .proactivity-icon {
+  color: #48bb78;
+}
+
+.proactivity-modal.tab-switching {
+  border-top: 4px solid #ed8936;
+}
+
+.proactivity-modal.tab-switching .proactivity-icon {
+  color: #ed8936;
+}
+
+.proactivity-modal.hyperfocus {
+  border-top: 4px solid #9f7aea;
+}
+
+.proactivity-modal.hyperfocus .proactivity-icon {
+  color: #9f7aea;
+}
+
+.proactivity-modal.task-reminder {
+  border-top: 4px solid #38b2ac;
+}
+
+.proactivity-modal.task-reminder .proactivity-icon {
+  color: #38b2ac;
+}
+
+/* Progress timer */
+.proactivity-progress {
+  margin-top: 16px;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.proactivity-timer {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 2px;
+  animation: proactivity-countdown 10s linear;
+  transform-origin: left;
+}
+
+@keyframes proactivity-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Wellness tip */
+.proactivity-wellness-tip {
+  background: #f0fff4;
+  border: 1px solid #c6f6d5;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  color: #22543d;
+  margin-top: 16px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 500px) {
+  .proactivity-modal {
+    margin: 20px;
+    padding: 24px;
+    min-width: auto;
+  }
+
+  .proactivity-modal h3 {
+    font-size: 20px;
+  }
+
+  .proactivity-modal p {
+    font-size: 14px;
+  }
+
+  .proactivity-btn {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .proactivity-modal {
+    border: 2px solid #333;
+  }
+
+  .proactivity-btn {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .proactivity-intervention,
+  .proactivity-modal,
+  .proactivity-btn {
+    transition: none;
+  }
+
+  .proactivity-timer {
+    animation: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .proactivity-modal {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+
+  .proactivity-modal h3 {
+    color: #f7fafc;
+  }
+
+  .proactivity-modal p {
+    color: #cbd5e0;
+  }
+
+  .proactivity-btn.secondary {
+    background: #4a5568;
+    color: #e2e8f0;
+  }
+
+  .proactivity-btn.secondary:hover {
+    background: #2d3748;
+  }
+
+  .proactivity-btn.tertiary {
+    border-color: #4a5568;
+    color: #a0aec0;
+  }
+
+  .proactivity-btn.tertiary:hover {
+    background: #1a202c;
+  }
+
+  .proactivity-progress {
+    background: #4a5568;
+  }
+
+  .proactivity-wellness-tip {
+    background: #1a202c;
+    border-color: #2d3748;
+    color: #9ae6b4;
+  }
+}

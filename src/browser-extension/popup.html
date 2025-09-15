@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proactivity Focus Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="logo">
+        <span class="logo-icon">🧠</span>
+        <span class="logo-text">Proactivity</span>
+      </div>
+      <div class="status-indicator" id="status-indicator">
+        <span class="status-dot"></span>
+        <span class="status-text">Monitoring</span>
+      </div>
+    </div>
+
+    <!-- Current Session -->
+    <div class="session-section">
+      <h3>Current Session</h3>
+      <div class="session-stats">
+        <div class="stat-item">
+          <span class="stat-value" id="focus-time">--</span>
+          <span class="stat-label">Focus Time</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="tab-switches">--</span>
+          <span class="stat-label">Tab Switches</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="procrastination-time">--</span>
+          <span class="stat-label">Break Time</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Energy Level -->
+    <div class="energy-section">
+      <h3>Current Energy</h3>
+      <div class="energy-buttons">
+        <button class="energy-btn" data-energy="high">⚡ High</button>
+        <button class="energy-btn" data-energy="moderate">🔋 Moderate</button>
+        <button class="energy-btn" data-energy="low">🪫 Low</button>
+        <button class="energy-btn" data-energy="depleted">😴 Depleted</button>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="actions-section">
+      <h3>Quick Actions</h3>
+      <div class="action-buttons">
+        <button class="action-btn primary" id="start-focus">
+          <span class="btn-icon">🎯</span>
+          Start Focus Session
+        </button>
+        <button class="action-btn secondary" id="show-tasks">
+          <span class="btn-icon">📋</span>
+          View Tasks
+        </button>
+        <button class="action-btn secondary" id="take-break">
+          <span class="btn-icon">☕</span>
+          Take Break
+        </button>
+      </div>
+    </div>
+
+    <!-- Current Task -->
+    <div class="task-section">
+      <h3>Current Task</h3>
+      <div class="current-task" id="current-task">
+        <input type="text" placeholder="What are you working on?" id="task-input">
+        <button class="task-save-btn" id="save-task">Save</button>
+      </div>
+    </div>
+
+    <!-- Intervention Settings -->
+    <div class="settings-section">
+      <h3>Gentle Interventions</h3>
+      <div class="setting-item">
+        <label class="setting-label">
+          <input type="checkbox" id="enable-procrastination-alerts">
+          <span class="checkmark"></span>
+          Procrastination nudges
+        </label>
+      </div>
+      <div class="setting-item">
+        <label class="setting-label">
+          <input type="checkbox" id="enable-hyperfocus-protection">
+          <span class="checkmark"></span>
+          Hyperfocus break reminders
+        </label>
+      </div>
+      <div class="setting-item">
+        <label class="setting-label">
+          <input type="checkbox" id="enable-tab-switching-alerts">
+          <span class="checkmark"></span>
+          Tab switching awareness
+        </label>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="popup-footer">
+      <button class="footer-btn" id="open-dashboard">
+        Open Dashboard
+      </button>
+      <button class="footer-btn" id="open-settings">
+        Settings
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

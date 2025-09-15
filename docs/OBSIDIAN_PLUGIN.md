@@ -1,8 +1,8 @@
-# ProActive PhD Obsidian Plugin Documentation
+# Proactivity Obsidian Plugin Documentation
 
 ## Overview
 
-The ProActive PhD Obsidian plugin provides seamless integration between your knowledge management workflow and ADHD-focused productivity assistance. It brings AI-powered task breakdown, pattern recognition, and proactive support directly into your Obsidian vault.
+The Proactivity Obsidian plugin provides seamless integration between your knowledge management workflow and ADHD-focused productivity assistance. It brings AI-powered task breakdown, pattern recognition, and proactive support directly into your Obsidian vault.
 
 ## Features
 
@@ -28,12 +28,12 @@ The ProActive PhD Obsidian plugin provides seamless integration between your kno
 
 ### Prerequisites
 - Obsidian v0.15.0 or higher
-- ProActive PhD backend server running (see main README)
+- Proactivity backend server running (see main README)
 - OpenAI API key
 
 ### Manual Installation
 1. Download the plugin files from the repository
-2. Copy to your vault's `.obsidian/plugins/proactive-phd/` directory
+2. Copy to your vault's `.obsidian/plugins/proactivity/` directory
 3. Enable in Obsidian Settings → Community Plugins
 4. Configure your API settings
 
@@ -64,7 +64,7 @@ Max Daily Notifications: 8-12
 ```
 Dissertation Folder: "Dissertation"
 Daily Notes Path: "Daily Notes"
-Task Tag Prefix: "#proactive-phd"
+Task Tag Prefix: "#proactivity"
 Enable Smart Linking: ✅
 Enable Progress Tracking: ✅
 ```
@@ -85,7 +85,7 @@ Enable Progress Tracking: ✅
 
 ### Main View Panel
 
-The ProActive PhD view appears in your right sidebar and includes:
+The Proactivity view appears in your right sidebar and includes:
 
 #### Energy Level Section
 - **Visual Energy Buttons**: High ⚡, Moderate 🔋, Low 🪫, Depleted 😴
@@ -126,30 +126,30 @@ Access all features via `Ctrl/Cmd + P`:
 
 | Command | Function |
 |---------|----------|
-| `ProActive PhD: Break down current task` | AI breakdown of selected text or current file |
-| `ProActive PhD: Quick energy level check` | Energy assessment modal |
-| `ProActive PhD: Start focused work session` | 25-minute Pomodoro timer |
-| `ProActive PhD: Help! I'm procrastinating` | Immediate intervention assistance |
-| `ProActive PhD: Celebrate progress made` | Progress acknowledgment |
-| `ProActive PhD: Start vacation mode` | Full out-of-office mode |
-| `ProActive PhD: Start deep focus mode` | Minimal interruption mode |
-| `ProActive PhD: End out of office mode` | Resume all features |
+| `Proactivity: Break down current task` | AI breakdown of selected text or current file |
+| `Proactivity: Quick energy level check` | Energy assessment modal |
+| `Proactivity: Start focused work session` | 25-minute Pomodoro timer |
+| `Proactivity: Help! I'm procrastinating` | Immediate intervention assistance |
+| `Proactivity: Celebrate progress made` | Progress acknowledgment |
+| `Proactivity: Start vacation mode` | Full out-of-office mode |
+| `Proactivity: Start deep focus mode` | Minimal interruption mode |
+| `Proactivity: End out of office mode` | Resume all features |
 
 ### Status Bar Integration
 
 The status bar shows your current state:
-- `ProActive: Ready` - All systems operational
-- `ProActive: Energy: moderate` - Current energy level
-- `ProActive: 🎯 Focusing` - Active focus session
-- `ProActive: 🏖️ Vacation Mode` - Out of office active
-- `ProActive: 🤝 Body Doubling` - Virtual partner active
+- `Proactivity: Ready` - All systems operational
+- `Proactivity: Energy: moderate` - Current energy level
+- `Proactivity: 🎯 Focusing` - Active focus session
+- `Proactivity: 🏖️ Vacation Mode` - Out of office active
+- `Proactivity: 🤝 Body Doubling` - Virtual partner active
 
 ## Workflows
 
 ### Daily Dissertation Workflow
 
 1. **Morning Setup**
-   - Open ProActive PhD panel
+   - Open Proactivity panel
    - Set your current energy level
    - Review AI-suggested tasks for the day
    - Choose one micro-task to start
@@ -212,7 +212,7 @@ The plugin can automatically enhance your daily notes:
 ```markdown
 # Daily Note - {{date}}
 
-#proactive-phd/daily-note
+#proactivity/daily-note
 
 ## Energy Tracking
 <!-- Automatic energy level updates -->
@@ -315,10 +315,10 @@ Enable debug mode in settings for detailed logging:
 
 ```javascript
 // Console commands for debugging
-ProActivePHD.getStatus()
-ProActivePHD.getPatterns()
-ProActivePHD.testConnection()
-ProActivePHD.exportData()
+Proactivity.getStatus()
+Proactivity.getPatterns()
+Proactivity.testConnection()
+Proactivity.exportData()
 ```
 
 ### Performance Optimization
@@ -420,7 +420,7 @@ npm run dev
 1. **Documentation**: Check this guide and the main README
 2. **GitHub Issues**: Report bugs and request features
 3. **Community**: Join discussions in the repository
-4. **Email**: Contact support@proactivephd.com for urgent issues
+4. **Community**: Join discussions in the repository for support
 
 ### Feedback
 
@@ -439,4 +439,4 @@ Consider participating in our research studies:
 - **Intervention Effectiveness**: Help validate our approaches
 - **User Experience**: Feedback on accessibility and usability
 
-The ProActive PhD plugin is designed by and for people with ADHD. Your experience and insights directly shape its development.
+The Proactivity plugin is designed by and for people with ADHD. Your experience and insights directly shape its development.
