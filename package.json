@@ -1,0 +1,51 @@
+{
+  "name": "proactive-phd",
+  "version": "1.0.0",
+  "description": "A proactive AI assistant for ADHD-focused dissertation writing with Obsidian integration",
+  "main": "src/backend/server.js",
+  "scripts": {
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:dev": "cd src/backend && nodemon server.js",
+    "frontend:dev": "cd src/frontend && npm run dev",
+    "build": "npm run backend:build && npm run frontend:build",
+    "backend:build": "cd src/backend && npm run build",
+    "frontend:build": "cd src/frontend && npm run build",
+    "test": "jest",
+    "lint": "eslint src/",
+    "start": "node src/backend/server.js"
+  },
+  "keywords": [
+    "adhd",
+    "productivity",
+    "dissertation",
+    "ai",
+    "obsidian",
+    "academic-writing",
+    "executive-function"
+  ],
+  "author": "ProActive PhD Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "openai": "^4.20.1",
+    "node-cron": "^3.0.3",
+    "moment": "^2.29.4",
+    "uuid": "^9.0.1",
+    "sqlite3": "^5.1.6",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "concurrently": "^8.2.2",
+    "jest": "^29.7.0",
+    "eslint": "^8.55.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

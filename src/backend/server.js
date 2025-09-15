@@ -1,0 +1,156 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Import routes
+import taskRoutes from './routes/taskRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import patternRoutes from './routes/patternRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import obsidianRoutes from './routes/obsidianRoutes.js';
+import outOfOfficeRoutes from './routes/outOfOfficeRoutes.js';
+
+// Import middleware
+import authMiddleware from './middleware/auth.js';
+import errorHandler from './middleware/errorHandler.js';
+import rateLimiter from './middleware/rateLimiter.js';
+
+// Import services
+import TaskBreakdownService from './services/taskBreakdownService.js';
+import ADHDPatternService from './services/adhdPatternService.js';
+import ProactiveNotificationService from './services/proactiveNotificationService.js';
+import OutOfOfficeService from './services/outOfOfficeService.js';
+
+// Initialize dotenv
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Initialize services
+const outOfOfficeService = new OutOfOfficeService();
+const taskBreakdownService = new TaskBreakdownService(process.env.OPENAI_API_KEY);
+const patternService = new ADHDPatternService();
+const notificationService = new ProactiveNotificationService(patternService);
+
+// Integrate out of office service with other services
+outOfOfficeService.registerHook('notifications', {
+  onPause: (config) => {
+    notificationService.pauseNotifications?.(config);
+    return { paused: true, service: 'notifications' };
+  },
+  onResume: (config) => {
+    notificationService.resumeNotifications?.(config);
+    return { resumed: true, service: 'notifications' };
+  }
+});
+
+outOfOfficeService.registerHook('patterns', {
+  onPause: (config) => {
+    patternService.pauseDetection?.(config);
+    return { paused: true, service: 'patterns' };
+  },
+  onResume: (config) => {
+    patternService.resumeDetection?.(config);
+    return { resumed: true, service: 'patterns' };
+  }
+});
+
+// Make services available to routes
+app.locals.services = {
+  taskBreakdown: taskBreakdownService,
+  patterns: patternService,
+  notifications: notificationService,
+  outOfOffice: outOfOfficeService
+};
+
+// Middleware
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://your-domain.com']
+    : ['http://localhost:3000', 'http://localhost:8080'],
+  credentials: true
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting for API protection
+app.use('/api/', rateLimiter);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+    services: {
+      taskBreakdown: !!taskBreakdownService,
+      patterns: !!patternService,
+      notifications: !!notificationService
+    }
+  });
+});
+
+// API Routes
+app.use('/api/tasks', taskRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/patterns', patternRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/obsidian', obsidianRoutes);
+app.use('/api/out-of-office', outOfOfficeRoutes);
+
+// Protected routes (require authentication)
+app.use('/api/protected/*', authMiddleware);
+
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(join(__dirname, '../frontend/dist')));
+
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, '../frontend/dist/index.html'));
+  });
+}
+
+// Error handling middleware (must be last)
+app.use(errorHandler);
+
+// Handle 404s
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    message: `The requested path ${req.originalUrl} does not exist`,
+    suggestion: 'Check the API documentation for available endpoints'
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 ProActive PhD Server running on port ${PORT}`);
+  console.log(`📋 Health check: http://localhost:${PORT}/health`);
+  console.log(`🧠 AI Task Breakdown: ${taskBreakdownService ? '✅' : '❌'}`);
+  console.log(`📊 Pattern Detection: ${patternService ? '✅' : '❌'}`);
+  console.log(`🔔 Notifications: ${notificationService ? '✅' : '❌'}`);
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`📖 API Docs: http://localhost:${PORT}/api/docs`);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
+export default app;

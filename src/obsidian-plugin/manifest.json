@@ -1,0 +1,11 @@
+{
+  "id": "proactive-phd",
+  "name": "ProActive PhD",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "AI-powered proactive assistant for ADHD-focused dissertation writing with intelligent task breakdown and pattern recognition.",
+  "author": "ProActive PhD Team",
+  "authorUrl": "https://github.com/alexbnewhouse/proactivity",
+  "fundingUrl": "",
+  "isDesktopOnly": false
+}
