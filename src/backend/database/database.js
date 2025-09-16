@@ -63,6 +63,7 @@ class Database {
 
   getDb() {
     if (!this.db) {
+      console.error('❌ Database not initialized. Call initialize() first.');
       throw new Error('Database not initialized. Call initialize() first.');
     }
     return this.db;

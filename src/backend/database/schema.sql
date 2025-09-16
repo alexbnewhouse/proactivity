@@ -78,6 +78,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     breakdown_strategy TEXT, -- momentum-building, parallel-processing, sequential
     ai_generated BOOLEAN DEFAULT FALSE,
 
+    -- Sync metadata for cross-platform support
+    source TEXT DEFAULT 'local', -- obsidian, extension, local, api
+    sync_status TEXT DEFAULT 'local', -- local, pending, synced, conflict
+
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
     FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE
@@ -354,3 +358,12 @@ INSERT OR IGNORE INTO habits (user_id, habit_name, description) VALUES
 (1, 'Morning Planning', 'Complete daily task planning before starting work'),
 (1, 'Energy Check-ins', 'Log energy level at least 3 times per day'),
 (1, 'Task Breakdown', 'Break down any task over 60 minutes into smaller pieces');
+
+-- Sync metadata table for cross-platform synchronization
+CREATE TABLE IF NOT EXISTS sync_metadata (
+    source TEXT PRIMARY KEY, -- 'obsidian', 'extension', etc.
+    last_sync DATETIME DEFAULT CURRENT_TIMESTAMP,
+    sync_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

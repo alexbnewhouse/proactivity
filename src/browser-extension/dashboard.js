@@ -235,6 +235,11 @@ class ProactivityDashboard {
     this.tasks.unshift(newTask);
     await chrome.storage.local.set({ tasks: this.tasks });
     
+    // Sync to shared storage for cross-platform access
+    if (typeof crossPlatformSync !== 'undefined') {
+      await crossPlatformSync.addTask(newTask);
+    }
+    
     // Queue for sync
     chrome.runtime.sendMessage({
       action: 'updateTasks',
@@ -564,27 +569,138 @@ class ProactivityDashboard {
   }
 
   async performFullSync() {
-    this.showNotification('🔄 Syncing...', 'Synchronizing with backend services');
+    this.showNotification('🔄 Syncing...', 'Synchronizing with Obsidian and backend services');
     
     try {
-      await this.loadData();
-      this.calculateStats();
-      this.updateUI();
-      
-      chrome.runtime.sendMessage({
-        action: 'fullSync',
-        data: {
-          tasks: this.tasks,
-          energyLevel: this.currentEnergyLevel,
-          stats: this.stats
+      // Use the new cross-platform sync
+      if (typeof crossPlatformSync !== 'undefined') {
+        // Load current local tasks
+        await this.loadData();
+        
+        // Sync our tasks to shared storage
+        const syncResult = await crossPlatformSync.syncFromSource(this.tasks, 'extension');
+        
+        // Get all synced tasks back
+        const allTasks = await crossPlatformSync.getAllTasks();
+        
+        // Update our local storage with synced data
+        this.tasks = allTasks;
+        await chrome.storage.local.set({ tasks: this.tasks });
+        
+        this.calculateStats();
+        this.updateUI();
+        
+        // Show result
+        const obsidianTasks = allTasks.filter(t => t.source === 'obsidian').length;
+        const message = obsidianTasks > 0 
+          ? `Synced ${syncResult.synced} tasks. Found ${obsidianTasks} from Obsidian.`
+          : `Synced ${syncResult.synced} tasks. No Obsidian tasks found.`;
+          
+        this.showNotification('✅ Sync Complete', message);
+        
+        if (syncResult.conflicts > 0) {
+          console.log(`Resolved ${syncResult.conflicts} conflicts`, syncResult.conflictDetails);
         }
-      });
+      } else {
+        // Fallback to old sync
+        chrome.runtime.sendMessage({
+          action: 'fullSync',
+          data: {
+            tasks: this.tasks,
+            energyLevel: this.currentEnergyLevel,
+            stats: this.stats
+          }
+        });
+        this.showNotification('✅ Sync Complete', 'All data synchronized successfully');
+      }
       
-      this.showNotification('✅ Sync Complete', 'All data synchronized successfully');
     } catch (error) {
-      this.showNotification('❌ Sync Failed', 'Could not sync with backend services');
+      this.showNotification('❌ Sync Failed', 'Could not sync with Obsidian/backend services');
       console.error('Sync error:', error);
     }
+  }
+
+  async readSharedStorageTasks() {
+    try {
+      // Try to read from shared file location
+      const response = await fetch('file:///Users/' + this.getUserHome() + '/.proactivity/tasks.json');
+      if (response.ok) {
+        const tasks = await response.json();
+        console.log('Loaded tasks from shared storage:', tasks.length);
+        return Array.isArray(tasks) ? tasks : [];
+      }
+    } catch (error) {
+      console.log('Could not read shared storage (expected in browser):', error.message);
+    }
+    
+    // Fallback: try localStorage sharing (for development/testing)
+    try {
+      const stored = localStorage.getItem('proactivity_shared_tasks');
+      if (stored) {
+        const tasks = JSON.parse(stored);
+        console.log('Loaded tasks from localStorage fallback:', tasks.length);
+        return Array.isArray(tasks) ? tasks : [];
+      }
+    } catch (error) {
+      console.error('Error reading localStorage fallback:', error);
+    }
+    
+    return [];
+  }
+
+  getUserHome() {
+    // Try to determine user home directory (limited in browser context)
+    return process.env.HOME || process.env.USERPROFILE || 'alexnewhouse';
+  }
+
+  async mergeTasks(browserTasks, sharedTasks) {
+    const merged = [...browserTasks];
+    const browserTaskIds = new Set(browserTasks.map(t => t.id));
+    const conflicts = [];
+    let newTasks = 0;
+    
+    // Add new tasks from shared storage
+    for (const sharedTask of sharedTasks) {
+      if (!browserTaskIds.has(sharedTask.id)) {
+        // New task from Obsidian
+        merged.unshift({
+          ...sharedTask,
+          syncStatus: 'synced',
+          syncedFrom: 'obsidian'
+        });
+        newTasks++;
+      } else {
+        // Check for conflicts
+        const browserTask = browserTasks.find(t => t.id === sharedTask.id);
+        const sharedTime = new Date(sharedTask.updatedAt || sharedTask.createdAt);
+        const browserTime = new Date(browserTask.updatedAt || browserTask.createdAt);
+        
+        if (sharedTime > browserTime) {
+          // Obsidian version is newer
+          const index = merged.findIndex(t => t.id === sharedTask.id);
+          merged[index] = {
+            ...sharedTask,
+            syncStatus: 'synced',
+            syncedFrom: 'obsidian'
+          };
+          conflicts.push({
+            taskId: sharedTask.id,
+            resolution: 'obsidian_wins',
+            reason: 'More recent timestamp'
+          });
+        }
+      }
+    }
+    
+    // Sort by creation date (newest first)
+    merged.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    return {
+      merged,
+      newTasks,
+      conflicts,
+      totalTasks: merged.length
+    };
   }
 
   showNotification(title, message) {

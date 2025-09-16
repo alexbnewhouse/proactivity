@@ -13,6 +13,7 @@ import obsidianRoutes from './routes/obsidianRoutes.js';
 import outOfOfficeRoutes from './routes/outOfOfficeRoutes.js';
 import docsRoutes from './routes/docsRoutes.js';
 import morningPlanningRoutes from './routes/morningPlanningRoutes.js';
+import syncRoutes from './routes/syncRoutes.js';
 
 // Import middleware
 import authMiddleware from './middleware/auth.js';
@@ -123,6 +124,7 @@ app.use('/api/obsidian', obsidianRoutes);
 app.use('/api/out-of-office', outOfOfficeRoutes);
 app.use('/api/docs', docsRoutes);
 app.use('/api/morning-planning', morningPlanningRoutes);
+app.use('/api/sync', syncRoutes);
 
 // Protected routes (require authentication)
 app.use('/api/protected/*', authMiddleware);

@@ -402,10 +402,52 @@ export class TaskBreakdownModal extends Modal {
       const updatedContent = this.updateTasksSection(content, taskEntry);
 
       await this.app.vault.modify(file, updatedContent);
+      
+      // Queue task for sync with browser extension
+      await this.queueTaskForSync(step);
+      
       new Notice(`Added "${step.title}" to daily note`);
     } catch (error) {
       console.error('Error adding step to vault:', error);
       new Notice('Error adding step to daily note');
+    }
+  }
+
+  private async queueTaskForSync(step: any) {
+    try {
+      // Create task in sync-compatible format
+      const syncTask = {
+        id: `obsidian_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: step.title,
+        description: step.description || '',
+        estimatedMinutes: step.estimatedMinutes || 30,
+        complexity: step.complexity || 'simple',
+        completed: false,
+        priority: 'medium',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        source: 'obsidian',
+        syncStatus: 'pending',
+        adhdOptimized: true,
+        motivationBooster: step.tips ? step.tips[0] : '',
+        energyRequired: step.energyRequired || 'moderate'
+      };
+
+      // Use the main plugin's sync service if available
+      const plugin = (this.app as any).plugins?.plugins?.proactivity;
+      if (plugin?.syncService) {
+        plugin.syncService.queueForSync({
+          type: 'task',
+          action: 'create',
+          data: syncTask,
+          timestamp: Date.now()
+        });
+        console.log('Task queued for sync via plugin service:', syncTask.title);
+      } else {
+        console.warn('Sync service not available, task only saved to vault');
+      }
+    } catch (error) {
+      console.error('Error queuing task for sync:', error);
     }
   }
 

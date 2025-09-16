@@ -532,10 +532,46 @@ var init_task_breakdown_modal = __esm({
 `;
           const updatedContent = this.updateTasksSection(content, taskEntry);
           await this.app.vault.modify(file, updatedContent);
+          await this.queueTaskForSync(step);
           new import_obsidian2.Notice(`Added "${step.title}" to daily note`);
         } catch (error) {
           console.error("Error adding step to vault:", error);
           new import_obsidian2.Notice("Error adding step to daily note");
+        }
+      }
+      async queueTaskForSync(step) {
+        var _a, _b;
+        try {
+          const syncTask = {
+            id: `obsidian_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            title: step.title,
+            description: step.description || "",
+            estimatedMinutes: step.estimatedMinutes || 30,
+            complexity: step.complexity || "simple",
+            completed: false,
+            priority: "medium",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            source: "obsidian",
+            syncStatus: "pending",
+            adhdOptimized: true,
+            motivationBooster: step.tips ? step.tips[0] : "",
+            energyRequired: step.energyRequired || "moderate"
+          };
+          const plugin = (_b = (_a = this.app.plugins) == null ? void 0 : _a.plugins) == null ? void 0 : _b.proactivity;
+          if (plugin == null ? void 0 : plugin.syncService) {
+            plugin.syncService.queueForSync({
+              type: "task",
+              action: "create",
+              data: syncTask,
+              timestamp: Date.now()
+            });
+            console.log("Task queued for sync via plugin service:", syncTask.title);
+          } else {
+            console.warn("Sync service not available, task only saved to vault");
+          }
+        } catch (error) {
+          console.error("Error queuing task for sync:", error);
         }
       }
       async addAllStepsToVault(steps) {
