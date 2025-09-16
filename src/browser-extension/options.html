@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proactivity Focus Assistant - Options</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Proactivity Focus Assistant</h1>
+            <p>Configure your ADHD-friendly productivity settings</p>
+        </header>
+
+        <main>
+            <section class="section">
+                <h2>🌅 Morning Planning Enforcement</h2>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="morningEnforcement" checked>
+                        Enable morning planning enforcement
+                    </label>
+                    <p class="description">Require daily planning completion before allowing unrestricted browsing</p>
+                </div>
+
+                <div class="setting">
+                    <label for="maxSpectrumLevel">Maximum enforcement level (1-10):</label>
+                    <input type="range" id="maxSpectrumLevel" min="1" max="10" value="8">
+                    <span id="spectrumLevelDisplay">8</span>
+                    <p class="description">Higher levels provide more forceful intervention when planning is delayed</p>
+                </div>
+
+                <div class="setting">
+                    <label for="workStartTime">Work day start time:</label>
+                    <input type="time" id="workStartTime" value="09:00">
+                    <p class="description">When morning planning enforcement should begin</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>🔔 Notifications</h2>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="enableNotifications" checked>
+                        Enable proactive notifications
+                    </label>
+                </div>
+
+                <div class="setting">
+                    <label for="notificationFrequency">Notification frequency:</label>
+                    <select id="notificationFrequency">
+                        <option value="gentle">Gentle (every 2 hours)</option>
+                        <option value="moderate" selected>Moderate (every hour)</option>
+                        <option value="frequent">Frequent (every 30 minutes)</option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>🎯 Task Management</h2>
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="enableTaskBreakdown" checked>
+                        Enable AI task breakdown suggestions
+                    </label>
+                </div>
+
+                <div class="setting">
+                    <label>
+                        <input type="checkbox" id="enablePatternDetection" checked>
+                        Enable ADHD pattern detection
+                    </label>
+                    <p class="description">Detect procrastination, hyperfocus, and task-switching patterns</p>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>🔗 Backend Connection</h2>
+                <div class="setting">
+                    <label for="serverUrl">Server URL:</label>
+                    <input type="url" id="serverUrl" value="http://localhost:3001" placeholder="http://localhost:3001">
+                    <p class="description">URL of your Proactivity backend server</p>
+                </div>
+
+                <div class="setting">
+                    <button id="testConnection" class="btn secondary">Test Connection</button>
+                    <span id="connectionStatus"></span>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <button id="saveSettings" class="btn primary">Save Settings</button>
+            <button id="resetSettings" class="btn secondary">Reset to Defaults</button>
+            <div id="saveStatus"></div>
+        </footer>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
