@@ -249,8 +249,14 @@ var ProactivityView = class extends import_obsidian2.ItemView {
     container.addClass("proactivity-view");
     this.renderMainInterface(container);
     await this.loadTodaysTasks();
+    if (this.settings.browserExtensionSync.enableSync) {
+      this.startBrowserSync();
+    }
   }
   async onClose() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+    }
   }
   renderMainInterface(container) {
     const header = container.createEl("div", { cls: "proactive-header" });
@@ -542,6 +548,45 @@ var ProactivityView = class extends import_obsidian2.ItemView {
     } catch (error) {
       console.error("Browser sync failed:", error);
       throw error;
+    }
+  }
+  startBrowserSync() {
+    console.log("Starting browser extension sync in ProactivityView...");
+    this.readBrowserExtensionData();
+    const syncIntervalMs = this.settings.browserExtensionSync.syncInterval * 60 * 1e3;
+    this.syncInterval = setInterval(() => {
+      this.readBrowserExtensionData();
+    }, syncIntervalMs);
+  }
+  async readBrowserExtensionData() {
+    try {
+      const browserData = localStorage.getItem("proactivity-browser-sync");
+      if (browserData) {
+        const parsed = JSON.parse(browserData);
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 3e5) {
+          console.log("Reading recent data from browser extension:", parsed);
+          if (parsed.tasks && Array.isArray(parsed.tasks)) {
+            for (const browserTask of parsed.tasks) {
+              if (!browserTask.id || browserTask.source === "obsidian")
+                continue;
+              try {
+                await this.integrationService.addTaskToVault(browserTask.title || browserTask.text, browserTask.priority);
+                console.log(`Added task from browser: ${browserTask.title}`);
+              } catch (error) {
+                console.error("Failed to add browser task to vault:", error);
+              }
+            }
+            this.loadTasksFromVault(this.containerEl.querySelector(".task-list"));
+            this.updateTaskStats();
+          }
+          if (parsed.energyLevel && parsed.energyLevel !== this.currentEnergyLevel) {
+            this.currentEnergyLevel = parsed.energyLevel;
+            console.log(`Updated energy level from browser: ${parsed.energyLevel}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to read browser extension data:", error);
     }
   }
   checkSyncStatus(statusIcon, statusText, lastSyncDiv) {

@@ -900,4 +900,128 @@ Generate 3-4 clarifying questions that would help make this task more actionable
       return [];
     }
   }
+
+  async generateProjectPlan(projectDescription: string, energyLevel?: string): Promise<{ title?: string; motivation?: string; steps: any[] }> {
+    // Use OpenAI if available, otherwise provide a basic fallback
+    try {
+      if (this.settings.apiKey) {
+        return this.generateProjectPlanWithOpenAI(projectDescription, energyLevel);
+      } else {
+        // Fallback plan generation
+        return this.generateBasicProjectPlan(projectDescription);
+      }
+    } catch (error) {
+      console.error('Failed to generate project plan:', error);
+      return this.generateBasicProjectPlan(projectDescription);
+    }
+  }
+
+  private async generateProjectPlanWithOpenAI(projectDescription: string, energyLevel: string = 'moderate'): Promise<{ title?: string; motivation?: string; steps: any[] }> {
+    const systemPrompt = `You are an ADHD-friendly project planning assistant. Help break down projects into manageable, concrete steps.
+
+Energy Level: ${energyLevel}
+
+Guidelines:
+- For high energy: Include 5-8 steps, allow complex tasks
+- For moderate energy: Include 3-5 steps, balance complexity
+- For low energy: Include 2-4 steps, focus on simple actions
+- For depleted energy: Include 1-3 micro-steps
+
+Each step should:
+- Have a clear, actionable title
+- Include realistic time estimate (5-120 minutes)
+- Be specific and concrete
+- Build logically toward the project goal
+
+Respond ONLY with JSON in this exact format:
+{
+  "title": "Clear project title",
+  "motivation": "Brief encouraging note about why this matters",
+  "steps": [
+    {
+      "title": "Specific actionable step",
+      "description": "Brief clarification if needed",
+      "estimatedMinutes": 30,
+      "priority": "high|medium|low"
+    }
+  ]
+}`;
+
+    const userPrompt = `Project to plan: ${projectDescription}`;
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.settings.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          max_tokens: 1000,
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices[0].message.content.trim();
+
+      // Parse JSON response
+      const parsed = JSON.parse(content);
+
+      return {
+        title: parsed.title,
+        motivation: parsed.motivation,
+        steps: parsed.steps || []
+      };
+
+    } catch (error) {
+      console.error('OpenAI project planning failed:', error);
+      throw error;
+    }
+  }
+
+  private generateBasicProjectPlan(projectDescription: string): { title?: string; motivation?: string; steps: any[] } {
+    // Basic fallback project planning without AI
+    const steps = [
+      {
+        title: 'Research and gather information',
+        description: 'Collect relevant resources and understand requirements',
+        estimatedMinutes: 30,
+        priority: 'high'
+      },
+      {
+        title: 'Create initial outline or plan',
+        description: 'Structure your approach to the project',
+        estimatedMinutes: 20,
+        priority: 'high'
+      },
+      {
+        title: 'Start with the first concrete step',
+        description: 'Begin working on the most important component',
+        estimatedMinutes: 45,
+        priority: 'high'
+      },
+      {
+        title: 'Review progress and adjust',
+        description: 'Check what\'s working and what needs refinement',
+        estimatedMinutes: 15,
+        priority: 'medium'
+      }
+    ];
+
+    return {
+      title: `Project: ${projectDescription.slice(0, 60)}${projectDescription.length > 60 ? '...' : ''}`,
+      motivation: 'You\'ve got this! Breaking it down into steps makes any project more manageable. 💪',
+      steps
+    };
+  }
 }

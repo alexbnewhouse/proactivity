@@ -11,7 +11,7 @@
   "browserExtensionSync": {
     "enableSync": true,
     "syncInterval": 5,
-    "lastSyncTimestamp": 1758024889693,
+    "lastSyncTimestamp": 1758026535134,
     "syncTasks": true,
     "syncEnergyLevels": true,
     "syncFocusSessions": true,

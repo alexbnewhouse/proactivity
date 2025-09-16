@@ -7,11 +7,12 @@ export const VIEW_TYPE_PROACTIVITY = 'proactivity-view';
 
 export class ProactivityView extends ItemView {
   private settings: ProactivitySettings;
-  private integrationService: ObsidianIntegrationService;
+  public integrationService: ObsidianIntegrationService;
   private apiClient: ProactivityApiClient;
-  private currentEnergyLevel: string = 'moderate';
+  public currentEnergyLevel: string = 'moderate';
   private todaysTasks: any[] = [];
   private currentFocus: string = '';
+  private syncInterval: NodeJS.Timeout;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -43,10 +44,18 @@ export class ProactivityView extends ItemView {
 
     this.renderMainInterface(container);
     await this.loadTodaysTasks();
+
+    // Start sync with browser extension
+    if (this.settings.browserExtensionSync.enableSync) {
+      this.startBrowserSync();
+    }
   }
 
   async onClose() {
-    // Clean up any intervals or subscriptions
+    // Clean up sync interval
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+    }
   }
 
   private renderMainInterface(container: HTMLElement) {
@@ -169,6 +178,13 @@ export class ProactivityView extends ItemView {
       text: '+ Add'
     });
 
+    // AI Project Planning button
+    const planningSection = dashboardSection.createEl('div', { cls: 'planning-section' });
+    const planningButton = planningSection.createEl('button', {
+      cls: 'ai-planning-btn',
+      text: '🤖 AI Project Planning'
+    });
+
     // Task list container
     const taskListContainer = dashboardSection.createEl('div', { cls: 'task-list-container' });
     const taskList = taskListContainer.createEl('div', { cls: 'task-list' });
@@ -188,6 +204,10 @@ export class ProactivityView extends ItemView {
       if (e.key === 'Enter') {
         addTask();
       }
+    });
+
+    planningButton.addEventListener('click', () => {
+      this.openAIProjectPlanningModal();
     });
 
     // Load existing tasks
@@ -455,6 +475,60 @@ export class ProactivityView extends ItemView {
     } catch (error) {
       console.error('Browser sync failed:', error);
       throw error;
+    }
+  }
+
+  private startBrowserSync() {
+    console.log('Starting browser extension sync in ProactivityView...');
+
+    // Initial sync
+    this.readBrowserExtensionData();
+
+    // Set up periodic sync
+    const syncIntervalMs = this.settings.browserExtensionSync.syncInterval * 60 * 1000;
+    this.syncInterval = setInterval(() => {
+      this.readBrowserExtensionData();
+    }, syncIntervalMs);
+  }
+
+  private async readBrowserExtensionData() {
+    try {
+      const browserData = localStorage.getItem('proactivity-browser-sync');
+      if (browserData) {
+        const parsed = JSON.parse(browserData);
+
+        // Only process recent data (within last 5 minutes)
+        if (parsed.timestamp && (Date.now() - parsed.timestamp) < 300000) {
+          console.log('Reading recent data from browser extension:', parsed);
+
+          // Update tasks if browser extension has newer data
+          if (parsed.tasks && Array.isArray(parsed.tasks)) {
+            // Add browser tasks to our task list
+            for (const browserTask of parsed.tasks) {
+              if (!browserTask.id || browserTask.source === 'obsidian') continue;
+
+              try {
+                await this.integrationService.addTaskToVault(browserTask.title || browserTask.text, browserTask.priority);
+                console.log(`Added task from browser: ${browserTask.title}`);
+              } catch (error) {
+                console.error('Failed to add browser task to vault:', error);
+              }
+            }
+
+            // Refresh the task list in UI
+            this.loadTasksFromVault(this.containerEl.querySelector('.task-list'));
+            this.updateTaskStats();
+          }
+
+          // Update energy level if different
+          if (parsed.energyLevel && parsed.energyLevel !== this.currentEnergyLevel) {
+            this.currentEnergyLevel = parsed.energyLevel;
+            console.log(`Updated energy level from browser: ${parsed.energyLevel}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to read browser extension data:', error);
     }
   }
 
@@ -903,6 +977,191 @@ class BreathingModal extends Modal {
     };
 
     setTimeout(runCycle, 1000);
+  }
+
+  private openAIProjectPlanningModal() {
+    const modal = new Modal(this.app);
+
+    modal.onOpen = () => {
+        const { contentEl } = modal;
+        contentEl.empty();
+        contentEl.addClass('ai-planning-modal');
+
+        // Add custom styles
+        const style = contentEl.createEl('style');
+        style.textContent = `
+          .ai-planning-modal {
+            max-width: 700px !important;
+            max-height: 80vh !important;
+          }
+          .planning-header {
+            text-align: center;
+            margin-bottom: 24px;
+          }
+          .planning-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 16px;
+            border: 2px solid var(--background-modifier-border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 16px;
+          }
+          .planning-input:focus {
+            border-color: var(--interactive-accent);
+            box-shadow: 0 0 0 3px rgba(var(--interactive-accent-rgb), 0.1);
+          }
+          .planning-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+          }
+          .planning-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .planning-btn.primary {
+            background: var(--interactive-accent);
+            color: white;
+          }
+          .planning-btn.primary:hover {
+            background: var(--interactive-accent-hover);
+          }
+          .planning-btn.secondary {
+            background: var(--background-secondary);
+            color: var(--text-normal);
+          }
+          .planning-btn.secondary:hover {
+            background: var(--background-modifier-hover);
+          }
+          .planning-output {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--background-secondary);
+            border-radius: 8px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+          }
+        `;
+
+        // Header
+        const header = contentEl.createEl('div', { cls: 'planning-header' });
+        header.createEl('h2', { text: '🤖 AI Project Planning Assistant' });
+        header.createEl('p', { text: 'Describe your project or goal and I\'ll help you break it down into actionable steps.' });
+
+        // Input area
+        const inputArea = contentEl.createEl('textarea', {
+          cls: 'planning-input',
+          placeholder: 'Describe your project in natural language...\n\nFor example:\n• "I need to write my dissertation chapter on machine learning"\n• "I want to build a mobile app for tracking habits"\n• "I need to organize a team retreat for 20 people"'
+        }) as HTMLTextAreaElement;
+
+        // Buttons
+        const buttonsDiv = contentEl.createEl('div', { cls: 'planning-buttons' });
+        const planButton = buttonsDiv.createEl('button', { cls: 'planning-btn primary', text: '🚀 Create Project Plan' });
+        const cancelButton = buttonsDiv.createEl('button', { cls: 'planning-btn secondary', text: 'Cancel' });
+
+        // Output area (initially hidden)
+        let outputDiv: HTMLDivElement;
+
+        // Event handlers
+        const self = this;
+        planButton.onclick = async () => {
+          const projectDescription = inputArea.value.trim();
+          if (!projectDescription) {
+            new Notice('Please describe your project first');
+            inputArea.focus();
+            return;
+          }
+
+          // Show loading state
+          planButton.textContent = '🤖 AI is planning...';
+          planButton.disabled = true;
+
+          try {
+            // Call AI planning service
+            const planResult = await self.integrationService.generateProjectPlan(
+              projectDescription,
+              self.currentEnergyLevel
+            );
+
+            // Create output area if it doesn't exist
+            if (!outputDiv) {
+              outputDiv = contentEl.createEl('div', { cls: 'planning-output' });
+            }
+
+            // Display the AI-generated plan
+            outputDiv.innerHTML = `
+              <h3>📋 Generated Project Plan</h3>
+              <p><strong>Project:</strong> ${planResult.title || projectDescription}</p>
+              ${planResult.motivation ? `<p><strong>Motivation:</strong> ${planResult.motivation}</p>` : ''}
+
+              <h4>🎯 Action Steps:</h4>
+              <ol>
+                ${planResult.steps.map(step => `
+                  <li>
+                    <strong>${step.title}</strong>
+                    <em>(${step.estimatedMinutes} min)</em>
+                    ${step.description ? `<br><small>${step.description}</small>` : ''}
+                  </li>
+                `).join('')}
+              </ol>
+
+              <div style="margin-top: 16px;">
+                <button class="planning-btn primary" id="add-all-steps">📋 Add All Steps to Vault</button>
+              </div>
+            `;
+
+            // Add handler for adding steps to vault
+            outputDiv.querySelector('#add-all-steps')?.addEventListener('click', async () => {
+              try {
+                for (const step of planResult.steps) {
+                  await self.integrationService.addTaskToVault(
+                    `${step.title} (${step.estimatedMinutes}min)`,
+                    step.priority || 'medium'
+                  );
+                }
+                new Notice(`Added ${planResult.steps.length} tasks to your vault!`);
+                modal.close();
+              } catch (error) {
+                console.error('Failed to add tasks to vault:', error);
+                new Notice('Failed to add tasks to vault');
+              }
+            });
+
+          } catch (error) {
+            console.error('AI planning failed:', error);
+            new Notice('AI planning failed. Please check your API key in settings.');
+
+            if (!outputDiv) {
+              outputDiv = contentEl.createEl('div', { cls: 'planning-output' });
+            }
+            outputDiv.textContent = '❌ AI planning failed. Please check your OpenAI API key in plugin settings and try again.';
+          } finally {
+            // Reset button
+            planButton.textContent = '🚀 Create Project Plan';
+            planButton.disabled = false;
+          }
+        };
+
+        cancelButton.onclick = () => modal.close();
+
+        // Auto-focus input
+        setTimeout(() => inputArea.focus(), 100);
+    };
+
+    modal.onClose = () => {
+      const { contentEl } = modal;
+      contentEl.empty();
+    };
+
+    modal.open();
   }
 
   onClose() {

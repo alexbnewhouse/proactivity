@@ -1,13 +1,45 @@
 /* Proactivity Browser Extension - Popup Styles */
+/* Modern design system - inspired by Notion/Todoist/Superhuman */
+
+:root {
+  --p-primary: #6366f1;
+  --p-primary-hover: #5b5bd6;
+  --p-primary-light: #eef2ff;
+  --p-success: #10b981;
+  --p-success-light: #ecfdf5;
+  --p-warning: #f59e0b;
+  --p-warning-light: #fffbeb;
+  --p-danger: #ef4444;
+  --p-danger-light: #fef2f2;
+  --p-gray-50: #f9fafb;
+  --p-gray-100: #f3f4f6;
+  --p-gray-200: #e5e7eb;
+  --p-gray-300: #d1d5db;
+  --p-gray-400: #9ca3af;
+  --p-gray-500: #6b7280;
+  --p-gray-600: #4b5563;
+  --p-gray-700: #374151;
+  --p-gray-800: #1f2937;
+  --p-gray-900: #111827;
+  --p-radius: 8px;
+  --p-radius-sm: 6px;
+  --p-radius-lg: 12px;
+  --p-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --p-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --p-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --p-transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 body {
   margin: 0;
   padding: 0;
   width: 360px;
   min-height: 500px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f8fafc;
-  color: #2d3748;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Inter', sans-serif;
+  background: var(--p-gray-50);
+  color: var(--p-gray-900);
+  line-height: 1.6;
+  font-size: 14px;
 }
 
 .popup-container {
@@ -21,7 +53,7 @@ body {
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--p-gray-200);
 }
 
 .logo {
@@ -125,7 +157,7 @@ body {
 
 .energy-btn {
   padding: 10px 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--p-gray-200);
   border-radius: 8px;
   background: white;
   color: #4a5568;
@@ -181,7 +213,7 @@ body {
 }
 
 .action-btn.secondary {
-  background: #e2e8f0;
+  background: var(--p-gray-200);
   color: #4a5568;
 }
 
@@ -202,7 +234,7 @@ body {
 #task-input {
   flex: 1;
   padding: 10px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--p-gray-200);
   border-radius: 6px;
   font-size: 14px;
   background: white;
@@ -261,7 +293,7 @@ body {
 .checkmark {
   width: 18px;
   height: 18px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--p-gray-200);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -292,13 +324,13 @@ body {
   gap: 8px;
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--p-gray-200);
 }
 
 .footer-btn {
   flex: 1;
   padding: 10px 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--p-gray-200);
   border-radius: 6px;
   background: white;
   color: #4a5568;
@@ -316,7 +348,7 @@ body {
 @media (prefers-color-scheme: dark) {
   body {
     background: #1a202c;
-    color: #e2e8f0;
+    color: var(--p-gray-200);
   }
 
   .session-section,
@@ -338,7 +370,7 @@ body {
   .energy-btn {
     background: #4a5568;
     border-color: #4a5568;
-    color: #e2e8f0;
+    color: var(--p-gray-200);
   }
 
   .energy-btn:hover {
@@ -347,7 +379,7 @@ body {
 
   .action-btn.secondary {
     background: #4a5568;
-    color: #e2e8f0;
+    color: var(--p-gray-200);
   }
 
   .action-btn.secondary:hover {
@@ -357,7 +389,7 @@ body {
   #task-input {
     background: #4a5568;
     border-color: #4a5568;
-    color: #e2e8f0;
+    color: var(--p-gray-200);
   }
 
   #task-input::placeholder {
@@ -371,7 +403,7 @@ body {
   .footer-btn {
     background: #4a5568;
     border-color: #4a5568;
-    color: #e2e8f0;
+    color: var(--p-gray-200);
   }
 
   .footer-btn:hover {
@@ -417,7 +449,7 @@ body {
 
 .urgent-tasks-list {
   background: white;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--p-gray-200);
   border-radius: 8px;
   margin-bottom: 10px;
   max-height: 180px;
@@ -567,7 +599,7 @@ body {
   }
 
   .urgent-task-title {
-    color: #e2e8f0;
+    color: var(--p-gray-200);
   }
 
   .urgent-task-meta {

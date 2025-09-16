@@ -349,6 +349,9 @@ class ProactivityDashboard {
 
     // Sync with backend
     this.syncWithBackend('task-created', newTask);
+
+    // Sync with Obsidian plugin
+    this.syncWithObsidian('task-created', newTask);
   }
 
   async toggleTask(taskId) {
@@ -374,6 +377,9 @@ class ProactivityDashboard {
 
     // Sync with backend
     this.syncWithBackend('task-updated', task);
+
+    // Sync with Obsidian plugin
+    this.syncWithObsidian('task-updated', task);
   }
 
   async deleteTask(taskId) {
@@ -384,6 +390,9 @@ class ProactivityDashboard {
 
     // Sync with backend
     this.syncWithBackend('task-deleted', { taskId });
+
+    // Sync with Obsidian plugin
+    this.syncWithObsidian('task-deleted', { taskId });
   }
 
   async saveTasks() {
@@ -655,6 +664,10 @@ class ProactivityDashboard {
 
   async syncWithBackend(action, data) {
     try {
+      // Sync with Obsidian plugin via localStorage
+      await this.syncWithObsidian(action, data);
+
+      // Also sync with backend if available
       const settings = await chrome.storage.sync.get(['backendUrl', 'apiKey']);
 
       if (settings.backendUrl && settings.apiKey) {
@@ -678,6 +691,72 @@ class ProactivityDashboard {
     } catch (error) {
       console.log('Backend sync error (this is ok for offline use):', error);
     }
+  }
+
+  async syncWithObsidian(action, data) {
+    try {
+      // Create sync data for Obsidian plugin to read
+      const syncData = {
+        action,
+        data,
+        tasks: this.tasks,
+        energyLevel: this.currentEnergyLevel,
+        timestamp: Date.now(),
+        source: 'browser-extension'
+      };
+
+      // Store in localStorage for Obsidian to read
+      localStorage.setItem('proactivity-browser-sync', JSON.stringify(syncData));
+
+      // Also try to read any data from Obsidian
+      const obsidianData = localStorage.getItem('proactivity-obsidian-sync');
+      if (obsidianData) {
+        const parsed = JSON.parse(obsidianData);
+
+        // If Obsidian data is recent (within last 5 minutes), merge it
+        if (parsed.timestamp && (Date.now() - parsed.timestamp) < 300000) {
+          console.log('Received recent data from Obsidian:', parsed);
+
+          // Merge tasks from Obsidian if they're newer
+          if (parsed.tasks && Array.isArray(parsed.tasks)) {
+            const merged = this.mergeTasks(this.tasks, parsed.tasks);
+            if (merged.length !== this.tasks.length) {
+              this.tasks = merged;
+              await this.saveTasks();
+              this.updateUI();
+            }
+          }
+
+          // Update energy level if different
+          if (parsed.energyLevel && parsed.energyLevel !== this.currentEnergyLevel) {
+            await this.setEnergyLevel(parsed.energyLevel);
+          }
+        }
+      }
+
+      console.log('Obsidian sync completed');
+    } catch (error) {
+      console.error('Obsidian sync failed:', error);
+    }
+  }
+
+  mergeTasks(browserTasks, obsidianTasks) {
+    const taskMap = new Map();
+
+    // Add browser tasks
+    browserTasks.forEach(task => {
+      taskMap.set(task.id, { ...task, source: 'browser' });
+    });
+
+    // Add or update with Obsidian tasks
+    obsidianTasks.forEach(obsTask => {
+      const existingTask = taskMap.get(obsTask.id);
+      if (!existingTask || (obsTask.lastModified && obsTask.lastModified > (existingTask.lastModified || 0))) {
+        taskMap.set(obsTask.id, { ...obsTask, source: 'obsidian' });
+      }
+    });
+
+    return Array.from(taskMap.values());
   }
 
   async performFullSync() {

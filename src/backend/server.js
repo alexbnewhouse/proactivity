@@ -87,8 +87,8 @@ app.locals.services = {
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://your-domain.com']
-    : ['http://localhost:3000', 'http://localhost:8080'],
+    ? ['https://your-domain.com', 'app://obsidian.md']
+    : ['http://localhost:3000', 'http://localhost:8080', 'app://obsidian.md'],
   credentials: true
 }));
 
