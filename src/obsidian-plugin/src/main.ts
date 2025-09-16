@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, ItemView, Modal } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, ItemView, Modal, MarkdownView } from 'obsidian';
 import { ProactivityView, VIEW_TYPE_PROACTIVITY } from './proactive-view';
 import { TaskBreakdownModal } from './task-breakdown-modal';
 import { ADHDPatternDetector } from './adhd-pattern-detector';
@@ -108,6 +108,14 @@ export default class ProactivityPlugin extends Plugin {
     this.addSettingTab(new ProactivitySettingTab(this.app, this));
 
     new Notice('Proactivity: Your ADHD-friendly dissertation assistant is ready!');
+
+    // Simple global for debugging
+    // @ts-ignore
+    (window as any).Proactivity = {
+      ctx: () => this.integrationService.getCurrentContext(),
+      suggestions: (lvl: string) => this.integrationService.getTaskSuggestions(lvl || 'moderate'),
+      celebrate: () => this.celebrateProgress()
+    };
   }
 
   private async testBackendConnection() {
@@ -220,6 +228,423 @@ export default class ProactivityPlugin extends Plugin {
       name: 'End out of office mode',
       callback: () => {
         new Notice('Welcome back! All features restored. ✨');
+      }
+    });
+
+    this.addCommand({
+      id: 'goblin-mode-breakdown',
+      name: 'Goblin Mode: Break down tasks in current file',
+      callback: async () => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view) { new Notice('Open a markdown file'); return; }
+        const editor = view.editor;
+        const selection = editor.getSelection() || editor.getValue();
+        const tasks = this.integrationService.parseTasksFromText(selection);
+        if (!tasks.length) { new Notice('No markdown tasks found (- [ ] )'); return; }
+
+        class GoblinModeModal extends Modal {
+          plugin: ProactivityPlugin;
+          tasksParsed: any[];
+          taskDepths: Record<string, number> = {}; // Track breakdown depth per task
+          
+          constructor(app: App, plugin: ProactivityPlugin, tasksParsed: any[]) {
+            super(app);
+            this.plugin = plugin;
+            this.tasksParsed = tasksParsed;
+            // Initialize depth tracking
+            this.tasksParsed.forEach(t => this.taskDepths[t.title] = 2);
+          }
+
+          onOpen() {
+            const { contentEl } = this; 
+            contentEl.empty();
+            contentEl.addClass('goblin-modal');
+
+            // Add custom styles
+            const style = contentEl.createEl('style');
+            style.textContent = `
+              .goblin-modal {
+                max-width: 800px !important;
+                max-height: 80vh !important;
+                overflow-y: auto;
+              }
+              .goblin-tips {
+                background: var(--background-secondary);
+                padding: 12px;
+                border-radius: 6px;
+                margin: 16px 0;
+                font-size: 0.9em;
+              }
+              .goblin-tips li {
+                margin: 6px 0;
+                list-style: none;
+                padding-left: 16px;
+                position: relative;
+              }
+              .goblin-tips li:before {
+                content: "💡";
+                position: absolute;
+                left: 0;
+              }
+              .goblin-task-row {
+                border: 1px solid var(--background-modifier-border);
+                border-radius: 8px;
+                padding: 16px;
+                margin: 12px 0;
+                background: var(--background-primary);
+              }
+              .goblin-task-title {
+                font-weight: 600;
+                margin-bottom: 12px;
+                color: var(--text-accent);
+                font-size: 1.1em;
+              }
+              .goblin-task-controls {
+                display: flex;
+                gap: 8px;
+                margin-bottom: 12px;
+                flex-wrap: wrap;
+              }
+              .goblin-task-controls button {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 0.9em;
+              }
+              .goblin-clarify-box {
+                background: var(--background-secondary);
+                padding: 12px;
+                border-radius: 6px;
+                margin: 12px 0;
+              }
+              .goblin-clarify-box p {
+                margin: 6px 0;
+              }
+              .clarify-input {
+                width: 100%;
+                min-height: 60px;
+                margin: 8px 0;
+                padding: 8px;
+                border-radius: 4px;
+                resize: vertical;
+              }
+              .goblin-steps {
+                background: var(--background-secondary);
+                padding: 16px;
+                border-radius: 8px;
+                margin-top: 12px;
+              }
+              .goblin-step {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px solid var(--background-modifier-border);
+              }
+              .goblin-step:last-child {
+                border-bottom: none;
+              }
+              .goblin-step-text {
+                flex: 1;
+                margin-right: 12px;
+              }
+              .step-add-btn, .step-breakdown-btn {
+                padding: 4px 8px;
+                font-size: 0.8em;
+                margin-left: 4px;
+              }
+              .goblin-step-controls {
+                display: flex;
+                gap: 4px;
+                align-items: center;
+              }
+              .goblin-footer {
+                margin-top: 24px;
+                padding-top: 16px;
+                border-top: 1px solid var(--background-modifier-border);
+                display: flex;
+                gap: 12px;
+                justify-content: space-between;
+                flex-wrap: wrap;
+              }
+            `;
+
+            // Tutorial header and quick guidance
+            contentEl.createEl('h2', { text: '🧌 Goblin Mode: AI Task Breakdown' });
+            contentEl.createEl('p', { text: 'AI-powered iterative task breakdown. Use Clarify to get smart questions and provide context, then Break Down for AI steps that get more granular with each click!' });
+
+            const tips = contentEl.createEl('ul', { cls: 'goblin-tips' });
+            tips.createEl('li', { text: 'AI Clarify generates smart questions specific to each task' });
+            tips.createEl('li', { text: 'Your clarify answers feed into AI breakdowns for better context' });
+            tips.createEl('li', { text: 'Each "Break Down" click makes steps more specific and granular' });
+            tips.createEl('li', { text: 'Break down individual AI-generated steps for ultra-fine detail' });
+
+            const listEl = contentEl.createEl('div', { cls: 'goblin-task-list' });
+
+            // Keep answers in-memory to allow adding later
+            const answers: Record<string, string[]> = {};
+
+            this.tasksParsed.forEach((t, taskIndex) => {
+              this.renderTaskRow(t, taskIndex, listEl, answers);
+            });
+
+            // Footer with global actions
+            const footer = contentEl.createEl('div', { cls: 'goblin-footer' });
+            
+            const addAllTasksBtn = footer.createEl('button', { text: '📥 Add All Generated Steps', cls: 'mod-cta' });
+            addAllTasksBtn.onclick = async () => {
+              await this.addAllGeneratedSteps();
+            };
+
+            const doneBtn = footer.createEl('button', { text: 'Close', cls: 'secondary-btn' });
+            doneBtn.onclick = () => this.close();
+          }
+
+          private renderTaskRow(t: any, taskIndex: number, listEl: HTMLElement, answers: Record<string, string[]>) {
+            const row = listEl.createEl('div', { cls: 'goblin-task-row' });
+            row.createEl('div', { text: t.title, cls: 'goblin-task-title' });
+
+            const controls = row.createEl('div', { cls: 'goblin-task-controls' });
+
+            // Clarify button
+            const qBtn = controls.createEl('button', { text: '❓ Clarify', cls: 'mod-cta' });
+            qBtn.onclick = () => {
+              this.showClarifyBox(row, t, taskIndex, answers);
+            };
+
+            // Break Down button with depth indicator
+            const currentDepth = this.taskDepths[t.title] || 2;
+            const depthLabel = currentDepth === 2 ? 'Break Down' : 
+                             currentDepth === 3 ? 'Break Down (Detailed)' :
+                             currentDepth === 4 ? 'Break Down (Micro)' : 
+                             'Break Down (Ultra-Fine)';
+            
+            const bBtn = controls.createEl('button', { text: `🔨 ${depthLabel}`, cls: 'mod-cta' });
+            bBtn.onclick = async () => {
+              await this.breakdownTask(row, t, answers);
+            };
+          }
+
+          private showClarifyBox(row: HTMLElement, t: any, taskIndex: number, answers: Record<string, string[]>) {
+            const boxId = `clarify-box-${taskIndex}`;
+            if (row.querySelector(`#${boxId}`)) return; // already open
+
+            const qbox = row.createEl('div', { cls: 'goblin-clarify-box', attr: { id: boxId } });
+            
+            // Show loading while generating AI questions
+            const loadingEl = qbox.createEl('p', { text: '🤖 Generating smart questions...', cls: 'muted' });
+            
+            // Generate AI questions
+            this.plugin.integrationService.generateClarifyingQuestions(t.title).then(qs => {
+              loadingEl.remove();
+              
+              qbox.createEl('p', { text: 'AI-generated clarifying questions:', cls: 'small' });
+              qs.forEach(q => qbox.createEl('p', { text: '• ' + q, cls: 'tiny' }));
+
+              const input = qbox.createEl('textarea', { cls: 'clarify-input', placeholder: 'Answer one or more questions above (be specific but concise)...' });
+              const buttonsEl = qbox.createEl('div', { cls: 'goblin-task-controls' });
+              
+              const saveBtn = buttonsEl.createEl('button', { text: '💾 Save Context', cls: 'mod-cta' });
+              saveBtn.onclick = () => {
+                const val = (input as HTMLTextAreaElement).value.trim();
+                if (!val) {
+                  new Notice('Please provide some context for better AI breakdowns');
+                  return;
+                }
+                answers[t.title] = answers[t.title] || [];
+                answers[t.title].push(val);
+                qbox.createEl('p', { text: '✓ Context saved: ' + val, cls: 'tiny muted' });
+                (input as HTMLTextAreaElement).value = '';
+                new Notice('Context saved! This will improve your next breakdown.');
+              };
+
+              const closeBtn = buttonsEl.createEl('button', { text: 'Close', cls: 'secondary-btn' });
+              closeBtn.onclick = () => qbox.remove();
+              
+            }).catch(err => {
+              loadingEl.textContent = '⚠️ AI questions unavailable - using fallback';
+              console.error('AI clarifying questions failed', err);
+              
+              // Fallback questions
+              const fallbackQuestions = [
+                'What specific outcome do you want?',
+                'What would "done" look like?',
+                'Any constraints or requirements?',
+                'How much time do you have?'
+              ];
+              
+              fallbackQuestions.forEach(q => qbox.createEl('p', { text: '• ' + q, cls: 'tiny' }));
+
+              const input = qbox.createEl('textarea', { cls: 'clarify-input', placeholder: 'Answer one or more questions above...' });
+              const buttonsEl = qbox.createEl('div', { cls: 'goblin-task-controls' });
+              
+              const saveBtn = buttonsEl.createEl('button', { text: '💾 Save Context', cls: 'mod-cta' });
+              saveBtn.onclick = () => {
+                const val = (input as HTMLTextAreaElement).value.trim();
+                if (!val) {
+                  new Notice('Please provide some context');
+                  return;
+                }
+                answers[t.title] = answers[t.title] || [];
+                answers[t.title].push(val);
+                qbox.createEl('p', { text: '✓ Context saved: ' + val, cls: 'tiny muted' });
+                (input as HTMLTextAreaElement).value = '';
+              };
+
+              const closeBtn = buttonsEl.createEl('button', { text: 'Close', cls: 'secondary-btn' });
+              closeBtn.onclick = () => qbox.remove();
+            });
+          }
+
+          private async breakdownTask(row: HTMLElement, t: any, answers: Record<string, string[]>) {
+            // Remove any existing steps to avoid duplication
+            const existingSteps = row.querySelector('.goblin-steps');
+            if (existingSteps) existingSteps.remove();
+
+            const spinner = row.createEl('span', { text: ' 🤖 AI thinking...', cls: 'muted' });
+            
+            try {
+              const currentDepth = this.taskDepths[t.title] || 2;
+              const context = answers[t.title] ? answers[t.title].join('. ') : '';
+              
+              const result = await this.plugin.integrationService.breakdownTask(t.title, { 
+                energyLevel: 'moderate', 
+                depth: currentDepth,
+                context: context 
+              });
+              
+              // Increment depth for next breakdown
+              this.taskDepths[t.title] = Math.min(currentDepth + 1, 6);
+              
+              // Update button text
+              const nextDepth = this.taskDepths[t.title];
+              const bBtn = row.querySelector('.goblin-task-controls button:last-child') as HTMLButtonElement;
+              if (bBtn) {
+                const nextLabel = nextDepth === 3 ? 'Break Down (Detailed)' :
+                                nextDepth === 4 ? 'Break Down (Micro)' :
+                                nextDepth >= 5 ? 'Break Down (Ultra-Fine)' : 'Break Down';
+                bBtn.textContent = `🔨 ${nextLabel}`;
+              }
+
+              this.renderSteps(row, result, t.title);
+              
+            } catch (err) {
+              console.error('Breakdown error', err);
+              new Notice('AI breakdown failed - check your OpenAI API key in settings');
+            } finally {
+              spinner.remove();
+            }
+          }
+
+          private renderSteps(row: HTMLElement, result: any, taskTitle: string) {
+            const stepsEl = row.createEl('div', { cls: 'goblin-steps' });
+            if (result.motivation) stepsEl.createEl('p', { text: result.motivation, cls: 'tiny muted' });
+            
+            result.steps.forEach((s: any, i: number) => {
+              const li = stepsEl.createEl('div', { cls: 'goblin-step', attr: { 'data-ai': 'true' } });
+              li.createEl('span', { text: `• ${s.title} (${s.estimatedMinutes}m)`, cls: 'goblin-step-text' });
+              
+              const controls = li.createEl('div', { cls: 'goblin-step-controls' });
+              
+              const addBtn = controls.createEl('button', { text: '+ Add', cls: 'step-add-btn mod-cta' });
+              addBtn.onclick = () => {
+                this.addStepToFile(s);
+              };
+
+              // Allow breaking down individual steps
+              const breakdownBtn = controls.createEl('button', { text: '🔨', cls: 'step-breakdown-btn' });
+              breakdownBtn.title = 'Break down this step with AI for more detail';
+              breakdownBtn.onclick = async () => {
+                await this.breakdownIndividualStep(li, s);
+              };
+            });
+
+            // Add 'Add All Steps' for this task
+            const addAllBtn = stepsEl.createEl('button', { text: '📋 Add All AI Steps', cls: 'mod-cta', attr: { style: 'margin-top: 12px;' } });
+            addAllBtn.onclick = () => {
+              this.addAllStepsForTask(result.steps);
+            };
+          }
+
+          private async breakdownIndividualStep(stepEl: HTMLElement, step: any) {
+            const spinner = stepEl.createEl('span', { text: ' 🤖', cls: 'muted' });
+            try {
+              const result = await this.plugin.integrationService.breakdownTask(step.title, { 
+                energyLevel: 'moderate', 
+                depth: 4, // Always go deep for individual steps
+                context: step.description 
+              });
+              
+              // Create sub-steps container
+              const subStepsEl = stepEl.createEl('div', { cls: 'goblin-substeps', attr: { style: 'margin-left: 20px; margin-top: 8px; padding: 8px; background: var(--background-primary); border-radius: 4px;' } });
+              result.steps.forEach((subStep: any) => {
+                const subLi = subStepsEl.createEl('div', { cls: 'goblin-substep', attr: { style: 'display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 0.9em;' } });
+                subLi.createEl('span', { text: `  ◦ ${subStep.title} (${subStep.estimatedMinutes}m)` });
+                
+                const addSubBtn = subLi.createEl('button', { text: '+ Add', cls: 'step-add-btn', attr: { style: 'font-size: 0.8em; padding: 2px 6px;' } });
+                addSubBtn.onclick = () => {
+                  this.addStepToFile(subStep);
+                };
+              });
+            } catch (err) {
+              console.error('Sub-breakdown error', err);
+              new Notice('Failed to break down step further');
+            } finally {
+              spinner.remove();
+            }
+          }
+
+          private addStepToFile(step: any) {
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (view) {
+              const editor = view.editor;
+              const insertion = `    - [ ] ${step.title} (${step.estimatedMinutes}min)`;
+              editor.replaceSelection(editor.getSelection() + '\n' + insertion + '\n');
+              new Notice('Step added to file');
+            }
+          }
+
+          private addAllStepsForTask(steps: any[]) {
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (view) {
+              const editor = view.editor;
+              const insertion = steps.map((s: any) => `    - [ ] ${s.title} (${s.estimatedMinutes}min)`).join('\n');
+              editor.replaceSelection(editor.getSelection() + '\n' + insertion + '\n');
+              new Notice('All steps added for task');
+            }
+          }
+
+          private async addAllGeneratedSteps() {
+            const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (!view) { 
+              new Notice('Open a markdown file to insert into'); 
+              return; 
+            }
+            const editor = view.editor;
+            
+            // Find all generated steps in the modal
+            const allSteps = this.contentEl.querySelectorAll('.goblin-step-text');
+            if (allSteps.length === 0) {
+              new Notice('No steps generated yet - try breaking down some tasks first');
+              return;
+            }
+            
+            let insertion = '';
+            allSteps.forEach((stepEl) => {
+              const text = stepEl.textContent;
+              if (text) {
+                insertion += '\n    - [ ] ' + text;
+              }
+            });
+            
+            editor.replaceSelection(editor.getSelection() + insertion + '\n');
+            new Notice(`Added ${allSteps.length} generated steps to file`);
+          }
+          onClose() {
+            const { contentEl } = this; contentEl.empty();
+          }
+        }
+        const modal = new GoblinModeModal(this.app, this, tasks);
+        modal.open();
       }
     });
   }
@@ -456,10 +881,15 @@ class ProactivitySettingTab extends PluginSettingTab {
 
     // API Configuration
     containerEl.createEl('h3', { text: 'API Configuration' });
+    
+    containerEl.createEl('p', { 
+      text: '🤖 For AI-powered task breakdowns in Goblin Mode, add your OpenAI API key below. Without this, you\'ll get basic fallback breakdowns.',
+      cls: 'setting-item-description'
+    });
 
     new Setting(containerEl)
       .setName('OpenAI API Key')
-      .setDesc('Your OpenAI API key for AI-powered task breakdown')
+      .setDesc('Get your API key from https://platform.openai.com/api-keys - enables smart task breakdown')
       .addText(text => text
         .setPlaceholder('sk-...')
         .setValue(this.plugin.settings.apiKey)
@@ -470,7 +900,7 @@ class ProactivitySettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Server URL')
-      .setDesc('Proactivity backend server URL')
+      .setDesc('Proactivity backend server URL (optional - OpenAI direct is preferred)')
       .addText(text => text
         .setPlaceholder('http://localhost:3001')
         .setValue(this.plugin.settings.serverUrl)

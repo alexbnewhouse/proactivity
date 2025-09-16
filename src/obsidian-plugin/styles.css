@@ -705,6 +705,180 @@
   margin: 20px 0;
 }
 
+/* Goblin Mode Modal - Enhanced styling for better UX */
+.goblin-modal {
+  font-family: var(--font-interface);
+}
+
+.goblin-modal .modal-title {
+  color: var(--text-accent);
+  border-bottom: 2px solid var(--interactive-accent);
+  padding-bottom: 8px;
+}
+
+/* Improved button spacing and hierarchy */
+.goblin-task-controls {
+  gap: 12px !important;
+  margin: 16px 0 !important;
+}
+
+.goblin-task-controls button {
+  border: 1px solid var(--interactive-normal);
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.goblin-task-controls button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.goblin-task-controls .mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.goblin-task-controls .mod-cta:hover {
+  background: var(--interactive-accent-hover);
+}
+
+/* Step breakdown visual hierarchy */
+.goblin-steps {
+  border-left: 3px solid var(--interactive-accent);
+  position: relative;
+}
+
+.goblin-step {
+  border-bottom: 1px solid var(--background-modifier-border-hover) !important;
+  padding: 12px 0 !important;
+}
+
+.goblin-step:hover {
+  background: var(--background-modifier-hover);
+  border-radius: 4px;
+  padding: 12px 8px !important;
+}
+
+.goblin-substeps {
+  border-left: 2px solid var(--text-muted) !important;
+  background: var(--background-modifier-form-field) !important;
+}
+
+.goblin-substep {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+/* Footer improvements */
+.goblin-footer {
+  background: var(--background-secondary);
+  padding: 16px !important;
+  margin: 24px -16px -16px -16px !important;
+  border-radius: 0 0 8px 8px;
+}
+
+.goblin-footer button {
+  flex: 1;
+  min-width: 140px;
+  padding: 10px 16px;
+  font-weight: 500;
+}
+
+/* Clarify box styling */
+.goblin-clarify-box {
+  border-left: 3px solid var(--text-accent);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.clarify-input {
+  border: 1px solid var(--interactive-normal) !important;
+  background: var(--background-primary) !important;
+  color: var(--text-normal) !important;
+}
+
+.clarify-input:focus {
+  border-color: var(--interactive-accent) !important;
+  box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+/* AI Loading States */
+.goblin-clarify-box .muted {
+  font-style: italic;
+  color: var(--text-muted);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Smart Questions Styling */
+.goblin-clarify-box .small {
+  font-weight: 600;
+  color: var(--text-accent);
+  margin-bottom: 8px;
+}
+
+.goblin-clarify-box .tiny {
+  color: var(--text-normal);
+  margin: 4px 0;
+  padding-left: 8px;
+}
+
+/* Context Saved Indicator */
+.goblin-clarify-box .tiny.muted {
+  background: var(--background-modifier-success);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin: 8px 0;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Enhanced button styling for AI features */
+.goblin-task-controls button[title] {
+  position: relative;
+}
+
+.goblin-task-controls button[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--background-tooltip);
+  color: var(--text-on-accent);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  white-space: nowrap;
+  z-index: 1000;
+}
+
+/* AI Breakdown Indicator */
+.goblin-step-text {
+  position: relative;
+}
+
+.goblin-step[data-ai="true"] .goblin-step-text::before {
+  content: "🤖";
+  font-size: 0.8em;
+  margin-right: 4px;
+  opacity: 0.7;
+}
+
 /* Responsive Design */
 @media (max-width: 600px) {
   .options-section {

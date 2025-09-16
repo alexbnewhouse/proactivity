@@ -1,0 +1,26 @@
+{
+  "apiKey": "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",
+  "serverUrl": "http://localhost:3001",
+  "enableProactiveNotifications": true,
+  "maxDailyNotifications": 12,
+  "defaultBreakdownDepth": 3,
+  "enablePatternDetection": true,
+  "enableHyperfocusProtection": true,
+  "procrastinationThreshold": 30,
+  "energyCheckInterval": 120,
+  "obsidianIntegration": {
+    "enableTaskSync": true,
+    "enableProgressTracking": true,
+    "enableSmartLinking": true,
+    "dissertationFolderPath": "Dissertation",
+    "dailyNotePath": "Daily Notes",
+    "taskTagPrefix": "#proactivity"
+  },
+  "adhdSupport": {
+    "useGentleTone": true,
+    "includeMotivation": true,
+    "limitCognitiveLoad": true,
+    "enableBodyDoubling": false,
+    "timeBlindnessSupport": true
+  }
+}
