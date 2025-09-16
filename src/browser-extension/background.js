@@ -26,6 +26,31 @@ class ProactivityBackgroundService {
 
     this.setupEventListeners();
     this.startMonitoring();
+    this.setupMessageHandlers();
+  }
+
+  setupMessageHandlers() {
+    // Handle messages from popup and tasks page
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      switch (message.action) {
+        case 'energyLevelChanged':
+          this.handleEnergyLevelChange(message.energyLevel);
+          break;
+        case 'updateSettings':
+          this.handleSettingsUpdate(message.settings);
+          break;
+        case 'startFocusSession':
+          this.startFocusSession(message.task);
+          break;
+        case 'getSessionData':
+          sendResponse({
+            session: this.currentSession,
+            timestamp: Date.now()
+          });
+          break;
+      }
+      return true; // Keep message channel open for async response
+    });
   }
 
   setupEventListeners() {
@@ -396,6 +421,57 @@ class ProactivityBackgroundService {
 
   isProcrastinationSite(domain) {
     return this.procrastinationSites.some(site => domain.includes(site));
+  }
+
+  async handleEnergyLevelChange(energyLevel) {
+    // Store energy level change
+    await chrome.storage.local.set({ 
+      currentEnergyLevel: energyLevel,
+      energyLevelChangedAt: Date.now()
+    });
+
+    // Sync with backend
+    this.syncWithBackend();
+    
+    console.log(`Energy level changed to: ${energyLevel}`);
+  }
+
+  async handleSettingsUpdate(settings) {
+    // Settings are already stored by the calling component
+    // Just trigger a sync
+    this.syncWithBackend();
+    
+    console.log('Settings updated:', settings);
+  }
+
+  async startFocusSession(task) {
+    // Reset session stats for new focus session
+    this.currentSession = {
+      startTime: Date.now(),
+      tabSwitches: 0,
+      procrastinationTime: 0,
+      focusTime: 0,
+      lastActiveTab: null,
+      activeTabStartTime: Date.now(),
+      currentTask: task
+    };
+
+    // Store current task
+    await chrome.storage.local.set({
+      currentSession: this.currentSession,
+      currentTask: task,
+      focusSessionStarted: Date.now()
+    });
+
+    // Show notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'Focus Session Started',
+      message: task ? `Working on: ${task}` : 'Focus session is active'
+    });
+
+    console.log('Focus session started:', task);
   }
 
   recordWindowEvent(event) {
