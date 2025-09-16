@@ -1,3 +1,157 @@
+# Dissertation Support – Obsidian Plugin
+
+A minimal, ADHD-friendly Obsidian plugin that gives you gentle, proactive nudges to keep moving on your dissertation — plus an optional one‑time AI powered planning assist to break the giant scary project into concrete, startable pieces.
+
+> Built intentionally small. No dashboards. No overwhelm. Just: plan once → get reminded → keep momentum.
+## Why It Exists
+If you have ADHD, the hardest part usually isn’t thinking or writing — it’s starting. Traditional productivity tools sit there waiting for you to open them. This plugin does the opposite: it comes to you with kind, low-friction prompts like:
+
+“Ready for 15 minutes?”
+“Open the doc and read the last paragraph?”
+“Want to outline the next subsection?”
+
+The goal: reduce activation energy and preserve continuity between sessions.
+## Core Features
+### 🔔 Proactive Reminders
+* Configurable interval (default 60 min)
+* Neutral, gentle tone (no shame, no gamified pressure)
+* Randomized phrasing to avoid alert fatigue
+
+### 🤖 One‑Time (or Periodic) AI Dissertation Plan
+* Breaks your topic into chapters → sections → micro‑tasks
+* Generates ADHD‑friendly next actions (5–25 minute granularity)
+* Suggests timeline scaffolding and milestone checkpoints
+* Saves everything as markdown so you own and can edit the output
+
+### 🧠 Micro‑Commitment Friendly
+Prompts emphasize tiny entry points (“open file”, “skim yesterday”, “add one sentence”) to defeat task initiation friction.
+
+### 🗂 100% Local Workflow
+* All data = markdown in your vault
+* Only external call: OpenAI (planning command) if you choose to run it
+* No background cloud sync layer, no external storage, no tracking
+
+---
+
+## Quick Start
+1. Download (or clone) the repo
+2. Copy `dissertation-support` into your vault at: `.obsidian/plugins/dissertation-support/`
+3. Enable the plugin in Obsidian: Settings → Community Plugins
+4. Open Settings → Dissertation Support
+5. Set (optional but recommended):
+   - OpenAI API Key
+   - Dissertation Topic
+   - Deadline
+   - Reminder Interval (minutes)
+6. Run command: “Plan my dissertation with AI” (optional)
+7. Leave Obsidian open and let the reminders do their thing
+
+### BRAT Install (Alternative)
+If you use the BRAT plugin:
+* Add: `alexbnewhouse/proactivity`
+* Enable “Dissertation Support”
+
+---
+
+## Commands
+| Command | What It Does |
+| ------- | ------------- |
+| Plan my dissertation with AI | Generates a structured plan markdown file |
+| Toggle proactive reminders | Enable / pause the hourly (or custom) nudges |
+| (Ribbon icon – brain) | Opens a quick action modal |
+
+---
+
+## Settings Overview
+| Setting | Purpose |
+| ------- | ------- |
+| Reminder interval | Minutes between nudges (default 60) |
+| Proactive reminders toggle | Master on/off switch |
+| OpenAI API key | Used only for the planning command |
+| Dissertation topic | Feeds the AI prompt so it tailors structure |
+| Deadline | Adds timeline awareness to the plan |
+
+All settings are stored locally inside the vault’s plugin data.
+
+---
+
+## Example Reminder Messages
+* “🎓 Ready for 15 minutes of work?”
+* “✍️ Open the doc and read the last sentence?”
+* “📚 Find 2 sources for the lit review?”
+* “📝 Add one transitional sentence?”
+* “🔍 Clarify the argument in section 2?”
+
+They are intentionally low‑pressure and action‑anchored.
+
+---
+
+## File Output (AI Plan)
+When you generate a plan, it creates a markdown file named:
+`Dissertation Plan - YYYY-MM-DD.md`
+
+It includes:
+* Frontmatter (topic, deadline, created date)
+* Hierarchical structure
+* Micro‑tasks
+* Suggested timelines
+* “Next session” notes section you can keep updating
+
+---
+
+## Privacy & Data
+| Aspect | Stored Where | Notes |
+| ------ | ------------ | ----- |
+| API Key | Local plugin data | Not synced outside vault |
+| Generated Plan | Markdown file | Fully editable by you |
+| Reminders State | Local | Interval + last shown timestamp |
+| No analytics | – | Nothing phoned home |
+
+You control everything. Remove the plugin = remove the behavior.
+
+---
+
+## Roadmap (Pragmatic, Lean)
+| Stage | Candidate Additions | Rationale |
+| ----- | ------------------- | --------- |
+| 1 (Now) | DONE: reminders + AI plan | Core activation support |
+| 2 | Context preservation ("Last worked on:") | Reduce restart friction |
+| 2 | Auto daily micro-plan note | Morning structure without thinking |
+| 3 | Simple progress metrics (sessions, words touched) | Gentle visibility, no judgment |
+| 3 | “Resume where you left off” command | Jumpstart flow state |
+| 4 | Monthly re-plan prompt | Realign trajectory without overwhelm |
+| Later (maybe) | Optional streaks (neutral framing) | Light momentum cue |
+
+If a feature doesn’t help you start—or restart—it probably won’t be added.
+
+---
+
+## Contributing
+Issues + PRs welcome—especially from neurodivergent researchers/writers. Keep proposals:
+* Small
+* Low cognitive overhead
+* Directly tied to task initiation or continuity
+
+See `CONTRIBUTING.md` for guidelines.
+
+---
+
+## License
+MIT — do whatever helps you write.
+
+---
+
+## Support / Appreciation
+If this helps you inch forward:
+* ⭐ Star the repo
+* 🐛 File bugs to keep it lean & stable
+* 💡 Suggest genuinely activation-focused improvements
+
+---
+
+**Built by someone with ADHD, for people with ADHD.**
+
+> Momentum beats perfection. One paragraph today is a win.
 # Dissertation Support - Obsidian Plugin# Proactivity
 
 
