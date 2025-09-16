@@ -275,6 +275,12 @@ class ProactivityBackgroundService {
       this.currentSession.focusTime += timeSpent;
     }
 
+    // Save updated session data to storage immediately
+    await chrome.storage.local.set({ 
+      currentSession: this.currentSession,
+      lastFocusTimeUpdate: Date.now()
+    });
+
     // Store in chrome.storage for persistence
     const storage = await chrome.storage.local.get(['tabTimeData']);
     const tabTimeData = storage.tabTimeData || {};

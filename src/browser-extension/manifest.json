@@ -51,7 +51,7 @@
   "options_page": "options.html",
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png", "options.html", "popup.html", "tasks.html", "dashboard.html", "dashboard.js", "blocked.html", "blocked.js"],
+      "resources": ["icons/*.png", "options.html", "popup.html", "tasks.html", "dashboard.html", "dashboard.js", "blocked.html", "blocked.js", "design-system.css", "theme-manager.js"],
       "matches": ["<all_urls>"]
     }
   ],

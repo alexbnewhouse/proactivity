@@ -51,12 +51,20 @@ class ProactivityDashboard {
       this.tasks = data.tasks || [];
       this.currentEnergyLevel = data.currentEnergyLevel || 3;
       
-      // Load current session data
+      // Load current session data and daily focus time
+      const today = new Date().toDateString();
+      const dailyStats = data.dailyStats || {};
+      const todayStats = dailyStats[today] || { focusTime: 0 };
+      
+      let sessionFocusTime = 0;
       if (data.currentSession) {
         this.timerMinutes = data.currentSession.remainingMinutes || 25;
         this.timerSeconds = data.currentSession.remainingSeconds || 0;
-        this.stats.focusTime = data.currentSession.focusTime || 0;
+        sessionFocusTime = Math.floor((data.currentSession.focusTime || 0) / (1000 * 60)); // Convert ms to minutes
       }
+
+      // Combine daily stats with current session
+      this.stats.focusTime = Math.max(todayStats.focusTime, sessionFocusTime);
 
       // Load streak data
       const streakData = data.streakData || {};
@@ -65,7 +73,7 @@ class ProactivityDashboard {
       // Calculate stats
       this.calculateStats();
       
-      console.log('Loaded data - Tasks:', this.tasks.length, 'Energy:', this.currentEnergyLevel);
+      console.log('Loaded data - Tasks:', this.tasks.length, 'Energy:', this.currentEnergyLevel, 'Focus Time:', this.stats.focusTime);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -349,9 +357,6 @@ class ProactivityDashboard {
 
     // Sync with backend
     this.syncWithBackend('task-created', newTask);
-
-    // Sync with Obsidian plugin
-    this.syncWithObsidian('task-created', newTask);
   }
 
   async toggleTask(taskId) {
@@ -377,9 +382,6 @@ class ProactivityDashboard {
 
     // Sync with backend
     this.syncWithBackend('task-updated', task);
-
-    // Sync with Obsidian plugin
-    this.syncWithObsidian('task-updated', task);
   }
 
   async deleteTask(taskId) {
@@ -390,9 +392,6 @@ class ProactivityDashboard {
 
     // Sync with backend
     this.syncWithBackend('task-deleted', { taskId });
-
-    // Sync with Obsidian plugin
-    this.syncWithObsidian('task-deleted', { taskId });
   }
 
   async saveTasks() {
@@ -625,49 +624,63 @@ class ProactivityDashboard {
   showNotification(title, message) {
     // Create a simple toast notification
     const notification = document.createElement('div');
+    
+    // Check if in sidebar mode
+    const isSidebar = document.body.classList.contains('sidebar-mode') || 
+                      document.querySelector('.container').classList.contains('sidebar-mode');
+    
     notification.style.cssText = `
       position: fixed;
-      top: 20px;
-      right: 20px;
-      background: var(--adhd-blue);
+      top: ${isSidebar ? '10px' : '20px'};
+      right: ${isSidebar ? '10px' : '20px'};
+      background: var(--p-primary);
       color: white;
-      padding: 16px 20px;
+      padding: ${isSidebar ? '12px 16px' : '16px 20px'};
       border-radius: 8px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-      z-index: 10000;
-      max-width: 350px;
-      font-size: 14px;
+      z-index: 9999;
+      max-width: ${isSidebar ? '280px' : '350px'};
+      font-size: ${isSidebar ? '13px' : '14px'};
       line-height: 1.4;
+      animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.3s ease;
     `;
     
     notification.innerHTML = `
       <div style="font-weight: 600; margin-bottom: 4px;">${title}</div>
-      <div style="font-size: 13px; opacity: 0.9;">${message}</div>
+      <div style="font-size: ${isSidebar ? '12px' : '13px'}; opacity: 0.9;">${message}</div>
     `;
     
     document.body.appendChild(notification);
     
-    // Auto remove after 5 seconds
+    // Auto remove after 4 seconds (shorter for sidebar mode)
+    const timeout = isSidebar ? 3000 : 5000;
     setTimeout(() => {
       if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
+        notification.style.animation = 'slideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
       }
-    }, 5000);
+    }, timeout);
     
     // Click to dismiss
     notification.addEventListener('click', () => {
       if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
+        notification.style.animation = 'slideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
       }
     });
   }
 
   async syncWithBackend(action, data) {
     try {
-      // Sync with Obsidian plugin via localStorage
-      await this.syncWithObsidian(action, data);
-
-      // Also sync with backend if available
       const settings = await chrome.storage.sync.get(['backendUrl', 'apiKey']);
 
       if (settings.backendUrl && settings.apiKey) {
@@ -691,72 +704,6 @@ class ProactivityDashboard {
     } catch (error) {
       console.log('Backend sync error (this is ok for offline use):', error);
     }
-  }
-
-  async syncWithObsidian(action, data) {
-    try {
-      // Create sync data for Obsidian plugin to read
-      const syncData = {
-        action,
-        data,
-        tasks: this.tasks,
-        energyLevel: this.currentEnergyLevel,
-        timestamp: Date.now(),
-        source: 'browser-extension'
-      };
-
-      // Store in localStorage for Obsidian to read
-      localStorage.setItem('proactivity-browser-sync', JSON.stringify(syncData));
-
-      // Also try to read any data from Obsidian
-      const obsidianData = localStorage.getItem('proactivity-obsidian-sync');
-      if (obsidianData) {
-        const parsed = JSON.parse(obsidianData);
-
-        // If Obsidian data is recent (within last 5 minutes), merge it
-        if (parsed.timestamp && (Date.now() - parsed.timestamp) < 300000) {
-          console.log('Received recent data from Obsidian:', parsed);
-
-          // Merge tasks from Obsidian if they're newer
-          if (parsed.tasks && Array.isArray(parsed.tasks)) {
-            const merged = this.mergeTasks(this.tasks, parsed.tasks);
-            if (merged.length !== this.tasks.length) {
-              this.tasks = merged;
-              await this.saveTasks();
-              this.updateUI();
-            }
-          }
-
-          // Update energy level if different
-          if (parsed.energyLevel && parsed.energyLevel !== this.currentEnergyLevel) {
-            await this.setEnergyLevel(parsed.energyLevel);
-          }
-        }
-      }
-
-      console.log('Obsidian sync completed');
-    } catch (error) {
-      console.error('Obsidian sync failed:', error);
-    }
-  }
-
-  mergeTasks(browserTasks, obsidianTasks) {
-    const taskMap = new Map();
-
-    // Add browser tasks
-    browserTasks.forEach(task => {
-      taskMap.set(task.id, { ...task, source: 'browser' });
-    });
-
-    // Add or update with Obsidian tasks
-    obsidianTasks.forEach(obsTask => {
-      const existingTask = taskMap.get(obsTask.id);
-      if (!existingTask || (obsTask.lastModified && obsTask.lastModified > (existingTask.lastModified || 0))) {
-        taskMap.set(obsTask.id, { ...obsTask, source: 'obsidian' });
-      }
-    });
-
-    return Array.from(taskMap.values());
   }
 
   async performFullSync() {
