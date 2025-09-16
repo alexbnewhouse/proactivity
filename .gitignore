@@ -19,12 +19,21 @@ build/
 # Logs
 logs/
 *.log
+server-test.log
+nohup.out
+
+# Database files (keep schema, ignore data)
+*.db-shm
+*.db-wal
+# Keep the main DB file but could be excluded in production
+# *.db
 
 # Runtime data
 pids/
 *.pid
 *.seed
 *.pid.lock
+server.pid
 
 # Coverage directory used by tools like istanbul
 coverage/

@@ -83,14 +83,15 @@ class ProactivitySyncService {
       // Sync with Obsidian plugin
       const obsidianSyncResult = await this.syncWithObsidian(localData);
       
-      // Sync with backend
-      const backendSyncResult = await this.syncWithBackend(localData);
+      // Push local task changes to backend then pull latest
+      const backendPushResult = await this.pushTasks(localData.tasks);
+      const backendPullResult = await this.pullTasks();
       
       // Resolve conflicts and merge data
       const mergedData = await this.resolveConflictsAndMerge(
         localData,
         obsidianSyncResult,
-        backendSyncResult
+        backendPullResult
       );
       
       // Update local storage
@@ -191,43 +192,146 @@ class ProactivitySyncService {
    * Sync with backend service
    */
   async syncWithBackend(localData) {
+    console.warn('syncWithBackend deprecated - use pushTasks/pullTasks');
+    return { source: 'backend', data: {}, timestamp: Date.now() };
+  }
+
+  /**
+   * Push tasks to backend /api/sync/push
+   */
+  async pushTasks(tasks) {
     try {
+      if (!tasks || tasks.length === 0) return { source: 'backend', data: {}, timestamp: Date.now() };
+      
+      // Filter to only push tasks that need syncing (optimization)
+      const tasksNeedingSync = tasks.filter(t => {
+        if (!t.lastPushTime) return true; // Never pushed
+        const taskUpdated = new Date(t.updatedAt || t.createdAt);
+        const lastPush = new Date(t.lastPushTime);
+        return taskUpdated > lastPush; // Task changed since last push
+      });
+      
+      if (tasksNeedingSync.length === 0) {
+        console.log('No tasks need pushing - all up to date');
+        return { source: 'backend', data: {}, timestamp: Date.now() };
+      }
+      
       const settings = await chrome.storage.local.get(['syncSettings']);
       const endpoint = settings.syncSettings?.backendEndpoint || 'http://localhost:3001/api';
       
-      const response = await fetch(`${endpoint}/sync`, {
+      // Normalize tasks for backend (status & id)
+      const normalized = tasksNeedingSync.map(t => ({
+        id: this.ensureNumericId(t.id),
+        title: t.title,
+        description: t.description || '',
+        priority: t.priority || 'medium',
+        completed: this.isTaskCompleted(t),
+        estimatedMinutes: t.estimatedMinutes || 30,
+        actualMinutes: t.actualMinutes || 0,
+        createdAt: t.createdAt || new Date().toISOString(),
+        updatedAt: t.updatedAt || t.createdAt || new Date().toISOString()
+      }));
+      
+      const response = await fetch(`${endpoint}/sync/push`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: localData,
-          lastSyncTime: this.lastSyncTime
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'extension', tasks: normalized, timestamp: Date.now() })
       });
-
-      if (!response.ok) {
-        throw new Error(`Backend sync failed: ${response.statusText}`);
-      }
-
+      
+      if (!response.ok) throw new Error(`Push failed: ${response.status} ${response.statusText}`);
+      
       const result = await response.json();
-      console.log('Backend sync result:', result);
+      console.log('Backend push result:', result);
       
-      return {
-        source: 'backend',
-        data: result.data || {},
-        conflicts: result.conflicts || [],
-        timestamp: result.timestamp || Date.now()
-      };
+      // Mark tasks as pushed
+      const now = new Date().toISOString();
+      await this.updateTasksPushTime(tasksNeedingSync.map(t => t.id), now);
       
+      return { source: 'backend', data: result.data || {}, timestamp: Date.now() };
+    } catch (e) {
+      console.error('pushTasks error', e);
+      return { source: 'backend', data: {}, error: e.message, timestamp: Date.now() };
+    }
+  }
+
+  /**
+   * Pull tasks from backend /api/sync/pull
+   */
+  async pullTasks() {
+    try {
+      const settings = await chrome.storage.local.get(['syncSettings', 'lastBackendPull']);
+      const endpoint = settings.syncSettings?.backendEndpoint || 'http://localhost:3001/api';
+      const since = settings.lastBackendPull || null;
+      const url = new URL(`${endpoint}/sync/pull`);
+      url.searchParams.set('source', 'extension');
+      if (since) url.searchParams.set('since', since);
+      const response = await fetch(url.toString());
+      if (!response.ok) throw new Error(`Pull failed: ${response.status} ${response.statusText}`);
+      const result = await response.json();
+      const tasks = (result.data || []).map(t => this.mapBackendTaskToLocal(t));
+      await chrome.storage.local.set({ lastBackendPull: new Date().toISOString() });
+      return { source: 'backend', data: { tasks }, timestamp: Date.now() };
+    } catch (e) {
+      console.error('pullTasks error', e);
+      return { source: 'backend', data: {}, error: e.message, timestamp: Date.now() };
+    }
+  }
+
+  /** Ensure task id is numeric for backend */
+  ensureNumericId(id) {
+    if (typeof id === 'number') return id;
+    if (/^\d+$/.test(id)) {
+      // fits in safe integer range? fallback to hash if too long
+      const asNum = Number(id);
+      if (asNum <= Number.MAX_SAFE_INTEGER) return asNum;
+    }
+    // derive deterministic numeric hash
+    let hash = 0;
+    const s = String(id);
+    for (let i = 0; i < s.length; i++) {
+      hash = (hash * 31 + s.charCodeAt(i)) >>> 0; // unsigned 32-bit
+    }
+    return hash;
+  }
+
+  isTaskCompleted(task) {
+    if (typeof task.completed === 'boolean') return task.completed;
+    if (task.status) return ['done', 'completed', 'complete'].includes(task.status.toLowerCase());
+    return false;
+  }
+
+  mapBackendTaskToLocal(task) {
+    return {
+      id: String(task.id),
+      title: task.title,
+      description: task.description,
+      priority: task.priority || 'medium',
+      status: task.completed ? 'done' : 'todo',
+      completed: task.completed,
+      estimatedMinutes: task.estimatedMinutes,
+      actualMinutes: task.actualMinutes,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      source: task.source || 'backend',
+      syncStatus: task.syncStatus || 'synced'
+    };
+  }
+
+  /**
+   * Update lastPushTime for tasks to optimize future syncs
+   */
+  async updateTasksPushTime(taskIds, timestamp) {
+    try {
+      const { tasks } = await chrome.storage.local.get(['tasks']);
+      const updatedTasks = (tasks || []).map(task => {
+        if (taskIds.includes(task.id)) {
+          return { ...task, lastPushTime: timestamp };
+        }
+        return task;
+      });
+      await chrome.storage.local.set({ tasks: updatedTasks });
     } catch (error) {
-      console.error('Backend sync error:', error);
-      return {
-        source: 'backend',
-        data: {},
-        error: error.message,
-        timestamp: Date.now()
-      };
+      console.error('Error updating task push times:', error);
     }
   }
 
@@ -390,14 +494,11 @@ class ProactivitySyncService {
    * Sync a task update
    */
   async syncTaskUpdate(taskData) {
-    const localData = await this.getLocalData();
-    const updatedData = { ...localData, tasks: [taskData] };
-    
-    // Send to Obsidian
-    await this.syncWithObsidian(updatedData);
-    
-    // Send to Backend
-    await this.syncWithBackend(updatedData);
+    // Accept either single task or array
+    const tasks = Array.isArray(taskData) ? taskData : [taskData];
+    await this.pushTasks(tasks);
+    // After push, pull to reconcile latest server state (lightweight)
+    await this.pullTasks();
   }
 
   /**

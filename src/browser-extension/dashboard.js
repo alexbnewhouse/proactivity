@@ -27,6 +27,7 @@ class ProactivityDashboard {
     await this.loadData();
     this.setupEventListeners();
     this.updateUI();
+    this.setupSyncStatusListener();
     this.startPeriodicUpdates();
     console.log('Proactivity Dashboard initialized');
   }
@@ -94,6 +95,24 @@ class ProactivityDashboard {
 
     document.getElementById('syncBtn').addEventListener('click', () => {
       this.performFullSync();
+    });
+
+    // Sync status hover
+    const syncContainer = document.querySelector('.sync-indicator-container');
+    const syncTooltip = document.getElementById('syncStatus');
+    
+    syncContainer.addEventListener('mouseenter', () => {
+      this.updateSyncStatusTooltip();
+      syncTooltip.style.display = 'block';
+    });
+    
+    syncContainer.addEventListener('mouseleave', () => {
+      syncTooltip.style.display = 'none';
+    });
+
+    // Conflict resolution
+    document.getElementById('resolveConflictsBtn').addEventListener('click', () => {
+      this.showConflictResolutionModal();
     });
 
     // Energy level buttons
@@ -194,8 +213,9 @@ class ProactivityDashboard {
     const scheduledStartTime = startTimeInput ? new Date(startTimeInput.value) : null;
     const scheduledEndTime = endTimeInput ? new Date(endTimeInput.value) : null;
 
+    const numericId = Date.now();
     const newTask = {
-      id: Date.now().toString(),
+      id: numericId.toString(),
       title: title,
       description: '',
       priority: priority,
@@ -240,11 +260,8 @@ class ProactivityDashboard {
       await crossPlatformSync.addTask(newTask);
     }
     
-    // Queue for sync
-    chrome.runtime.sendMessage({
-      action: 'updateTasks',
-      tasks: this.tasks
-    });
+    // Queue only the new task for sync (background will handle individual push)
+    chrome.runtime.sendMessage({ action: 'updateTasks', tasks: [newTask] });
     
     this.hideTaskInput();
     this.calculateStats();
@@ -549,6 +566,7 @@ class ProactivityDashboard {
     this.updateStats();
     this.updateEnergyDisplay();
     this.updateTimerDisplay();
+    this.updateSyncIndicator();
     
     if (this.currentView === 'list') {
       this.updateTasksList();
@@ -569,6 +587,7 @@ class ProactivityDashboard {
   }
 
   async performFullSync() {
+    this.setSyncStatus('syncing');
     this.showNotification('🔄 Syncing...', 'Synchronizing with Obsidian and backend services');
     
     try {
@@ -597,6 +616,7 @@ class ProactivityDashboard {
           : `Synced ${syncResult.synced} tasks. No Obsidian tasks found.`;
           
         this.showNotification('✅ Sync Complete', message);
+        this.setSyncStatus('success');
         
         if (syncResult.conflicts > 0) {
           console.log(`Resolved ${syncResult.conflicts} conflicts`, syncResult.conflictDetails);
@@ -612,10 +632,12 @@ class ProactivityDashboard {
           }
         });
         this.showNotification('✅ Sync Complete', 'All data synchronized successfully');
+        this.setSyncStatus('success');
       }
       
     } catch (error) {
       this.showNotification('❌ Sync Failed', 'Could not sync with Obsidian/backend services');
+      this.setSyncStatus('error');
       console.error('Sync error:', error);
     }
   }
@@ -1183,6 +1205,313 @@ class ProactivityDashboard {
 
     this.showNotification('🎉 Tasks Added!', `Added ${tasksToAdd.length} AI-generated tasks to your dashboard`);
   }
+
+  setupSyncStatusListener() {
+    // Listen for sync complete messages from background
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.action === 'syncComplete') {
+        this.setSyncStatus('success');
+        this.updateSyncStatusTooltip(message.timestamp);
+      } else if (message.action === 'syncError') {
+        this.setSyncStatus('error');
+        this.updateSyncStatusTooltip();
+      }
+    });
+  }
+
+  setSyncStatus(status) {
+    const syncIcon = document.getElementById('syncIcon');
+    const syncText = document.getElementById('syncText');
+    
+    switch (status) {
+      case 'syncing':
+        syncIcon.textContent = '🔄';
+        syncIcon.className = 'sync-spinner';
+        syncText.textContent = 'Syncing...';
+        break;
+      case 'success':
+        syncIcon.textContent = '✅';
+        syncIcon.className = '';
+        syncText.textContent = 'Sync';
+        // Reset to default after 2 seconds
+        setTimeout(() => {
+          syncIcon.textContent = '🔄';
+          syncText.textContent = 'Sync';
+        }, 2000);
+        break;
+      case 'error':
+        syncIcon.textContent = '❌';
+        syncIcon.className = '';
+        syncText.textContent = 'Sync';
+        // Reset to default after 3 seconds
+        setTimeout(() => {
+          syncIcon.textContent = '🔄';
+          syncText.textContent = 'Sync';
+        }, 3000);
+        break;
+      default:
+        syncIcon.textContent = '🔄';
+        syncIcon.className = '';
+        syncText.textContent = 'Sync';
+    }
+  }
+
+  updateSyncIndicator() {
+    // Get sync status from storage and update indicator
+    chrome.storage.local.get(['lastSyncTime', 'syncConflicts']).then(data => {
+      const lastSync = data.lastSyncTime;
+      const conflicts = data.syncConflicts || [];
+      
+      if (conflicts.length > 0) {
+        document.getElementById('syncIcon').textContent = '⚠️';
+        this.showConflictsBanner(conflicts.length);
+      } else {
+        this.hideConflictsBanner();
+      }
+    });
+  }
+
+  showConflictsBanner(count) {
+    const banner = document.getElementById('conflictsBanner');
+    const countElement = document.getElementById('conflictsCount');
+    countElement.textContent = count;
+    banner.style.display = 'block';
+  }
+
+  hideConflictsBanner() {
+    const banner = document.getElementById('conflictsBanner');
+    banner.style.display = 'none';
+  }
+
+  async showConflictResolutionModal() {
+    const data = await chrome.storage.local.get(['syncConflicts']);
+    const conflicts = data.syncConflicts || [];
+    
+    if (conflicts.length === 0) {
+      this.showNotification('ℹ️ No Conflicts', 'No sync conflicts to resolve');
+      return;
+    }
+
+    // Create modal dynamically
+    const modal = document.createElement('div');
+    modal.className = 'conflict-modal-overlay';
+    modal.innerHTML = `
+      <div class="conflict-modal">
+        <div class="conflict-modal-header">
+          <h3>Resolve Sync Conflicts</h3>
+          <button class="conflict-modal-close">&times;</button>
+        </div>
+        <div class="conflict-modal-body">
+          ${conflicts.map((conflict, index) => `
+            <div class="conflict-item" data-conflict-id="${conflict.id}">
+              <h4>Task: ${conflict.local?.title || conflict.remote?.title || 'Unknown'}</h4>
+              <div class="conflict-options">
+                <div class="conflict-option">
+                  <input type="radio" name="conflict_${index}" value="use_local" id="local_${index}">
+                  <label for="local_${index}">
+                    <strong>Use Local Version</strong><br>
+                    ${JSON.stringify(conflict.local, null, 2).slice(0, 200)}...
+                  </label>
+                </div>
+                <div class="conflict-option">
+                  <input type="radio" name="conflict_${index}" value="use_remote" id="remote_${index}">
+                  <label for="remote_${index}">
+                    <strong>Use Remote Version</strong><br>
+                    ${JSON.stringify(conflict.remote, null, 2).slice(0, 200)}...
+                  </label>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="conflict-modal-footer">
+          <button class="btn btn-secondary" id="conflictCancel">Cancel</button>
+          <button class="btn btn-primary" id="conflictResolve">Resolve All</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Add styles
+    const style = document.createElement('style');
+    style.textContent = `
+      .conflict-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      .conflict-modal {
+        background: white;
+        border-radius: 8px;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow-y: auto;
+        margin: 20px;
+      }
+      .conflict-modal-header {
+        padding: 20px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .conflict-modal-body {
+        padding: 20px;
+      }
+      .conflict-item {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+      }
+      .conflict-options {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 15px;
+      }
+      .conflict-option {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+      }
+      .conflict-option label {
+        cursor: pointer;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .conflict-modal-footer {
+        padding: 20px;
+        border-top: 1px solid #eee;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .conflict-modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Event handlers
+    modal.querySelector('.conflict-modal-close').onclick = () => {
+      document.body.removeChild(modal);
+      document.head.removeChild(style);
+    };
+    
+    modal.querySelector('#conflictCancel').onclick = () => {
+      document.body.removeChild(modal);
+      document.head.removeChild(style);
+    };
+    
+    modal.querySelector('#conflictResolve').onclick = async () => {
+      const resolutions = [];
+      conflicts.forEach((conflict, index) => {
+        const selected = modal.querySelector(`input[name="conflict_${index}"]:checked`);
+        if (selected) {
+          resolutions.push({
+            conflictId: conflict.id,
+            resolution: {
+              action: selected.value,
+              local: conflict.local,
+              remote: conflict.remote
+            }
+          });
+        }
+      });
+
+      // Resolve conflicts
+      for (const res of resolutions) {
+        await this.resolveConflict(res.conflictId, res.resolution);
+      }
+
+      document.body.removeChild(modal);
+      document.head.removeChild(style);
+      this.showNotification('✅ Conflicts Resolved', `Resolved ${resolutions.length} conflicts`);
+      this.updateSyncIndicator();
+    };
+  }
+
+  async resolveConflict(conflictId, resolution) {
+    const { syncConflicts } = await chrome.storage.local.get(['syncConflicts']);
+    const conflicts = syncConflicts || [];
+    
+    const conflictIndex = conflicts.findIndex(c => c.id === conflictId);
+    if (conflictIndex === -1) return;
+    
+    const conflict = conflicts[conflictIndex];
+    
+    // Apply resolution to local tasks
+    const { tasks } = await chrome.storage.local.get(['tasks']);
+    const updatedTasks = tasks || [];
+    
+    if (resolution.action === 'use_local') {
+      // Keep local version, just remove conflict
+    } else if (resolution.action === 'use_remote') {
+      // Replace local with remote
+      const taskIndex = updatedTasks.findIndex(t => t.id === conflict.taskId);
+      if (taskIndex >= 0) {
+        updatedTasks[taskIndex] = conflict.remote;
+      } else {
+        updatedTasks.push(conflict.remote);
+      }
+    }
+    
+    await chrome.storage.local.set({ tasks: updatedTasks });
+    
+    // Remove resolved conflict
+    conflicts.splice(conflictIndex, 1);
+    await chrome.storage.local.set({ syncConflicts: conflicts });
+    
+    // Update UI
+    this.tasks = updatedTasks;
+    this.updateUI();
+  }
+
+  async updateSyncStatusTooltip(timestamp = null) {
+    const data = await chrome.storage.local.get(['lastSyncTime', 'syncConflicts']);
+    const lastSync = timestamp || data.lastSyncTime;
+    const conflicts = data.syncConflicts || [];
+    
+    const statusText = document.getElementById('syncStatusText');
+    const lastTimeText = document.getElementById('syncLastTime');
+    
+    if (conflicts.length > 0) {
+      statusText.textContent = `${conflicts.length} sync conflicts need resolution`;
+    } else if (lastSync) {
+      statusText.textContent = 'Sync up to date';
+    } else {
+      statusText.textContent = 'Not synced yet';
+    }
+    
+    if (lastSync) {
+      const lastSyncDate = new Date(lastSync);
+      const now = new Date();
+      const diffMinutes = Math.floor((now - lastSyncDate) / (1000 * 60));
+      
+      if (diffMinutes < 1) {
+        lastTimeText.textContent = 'Just now';
+      } else if (diffMinutes < 60) {
+        lastTimeText.textContent = `${diffMinutes}m ago`;
+      } else {
+        const diffHours = Math.floor(diffMinutes / 60);
+        lastTimeText.textContent = `${diffHours}h ago`;
+      }
+    } else {
+      lastTimeText.textContent = '';
+    }
+  }
+
 }
 
 // Initialize dashboard

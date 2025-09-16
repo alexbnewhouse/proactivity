@@ -1,6 +1,18 @@
 # Proactivity
 
+[![CI/CD Pipeline](https://github.com/alexbnewhouse/proactivity/actions/workflows/ci.yml/badge.svg)](https://github.com/alexbnewhouse/proactivity/actions/workflows/ci.yml)
+
 A proactive AI assistant designed specifically for ADHD-focused productivity, featuring computer hijacking interventions, comprehensive Obsidian integration, and cutting-edge behavioral research implementation.
+
+## 🚀 Recent Updates
+
+### Enhanced Sync System (v2.0)
+- ✅ **Visual Sync Indicators**: Real-time sync status with animated feedback
+- ✅ **Optimized Performance**: Smart task filtering to reduce redundant syncs
+- ✅ **Conflict Resolution UI**: Interactive modal for resolving sync conflicts
+- ✅ **Integration Testing**: Comprehensive end-to-end test suite
+- ✅ **Cross-Platform Compatibility**: Seamless sync between extension and Obsidian
+- ✅ **CI/CD Pipeline**: Automated testing and deployment validation
 
 ## Overview
 

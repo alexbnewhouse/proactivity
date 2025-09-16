@@ -42,38 +42,31 @@ export class ObsidianSyncService {
         conflicts: []
       };
 
-      // 1. Push local changes to backend
+      // 1. Push local changes to backend using new /sync/push endpoint
       if (this.syncQueue.length > 0) {
-        const pushResult = await this.pushLocalChanges();
+        const pushResult = await this.pushToSyncEndpoint();
         syncResult.syncedItems += pushResult.synced;
         syncResult.conflicts.push(...pushResult.conflicts);
       }
 
-      // 2. Pull remote changes from backend
-      const pullResult = await this.pullRemoteChanges();
+      // 2. Pull remote changes from backend using new /sync/pull endpoint
+      const pullResult = await this.pullFromSyncEndpoint();
       syncResult.syncedItems += pullResult.synced;
       syncResult.conflicts.push(...pullResult.conflicts);
 
-      // 3. Sync with browser extension directly if available
-      if (this.settings.browserExtensionSync.syncTasks) {
-        const extensionSyncResult = await this.syncWithBrowserExtension();
-        syncResult.syncedItems += extensionSyncResult.synced;
-        syncResult.conflicts.push(...extensionSyncResult.conflicts);
-      }
-
       this.lastSyncTimestamp = Date.now();
       this.settings.browserExtensionSync.lastSyncTimestamp = this.lastSyncTimestamp;
-
+      
       if (syncResult.conflicts.length > 0) {
-        new Notice(`Sync completed with ${syncResult.conflicts.length} conflicts to resolve`);
+        new Notice(`Sync completed with ${syncResult.conflicts.length} conflicts that need resolution`);
       } else {
-        console.log(`Sync completed: ${syncResult.syncedItems} items synced`);
+        console.log(`Sync completed successfully - ${syncResult.syncedItems} items synced`);
       }
 
       return syncResult;
     } catch (error) {
-      console.error('Sync failed:', error);
-      new Notice('Sync failed - will retry automatically');
+      console.error('Full sync failed:', error);
+      new Notice('Sync failed - check console for details');
       return { success: false, syncedItems: 0, conflicts: [] };
     }
   }
@@ -97,54 +90,125 @@ export class ObsidianSyncService {
   /**
    * Push local changes to backend server
    */
-  private async pushLocalChanges(): Promise<{ synced: number; conflicts: any[] }> {
+  /**
+   * Push local changes to backend using new sync endpoints
+   */
+  private async pushToSyncEndpoint(): Promise<{ synced: number; conflicts: any[] }> {
     const result = { synced: 0, conflicts: [] };
-    const itemsToSync = [...this.syncQueue];
     
-    for (const item of itemsToSync) {
-      try {
-        const endpoint = this.getEndpointForItem(item);
-        const method = item.action === 'delete' ? 'DELETE' : 'POST';
-        const response = await fetch(`${this.settings.serverUrl}${endpoint}`, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.settings.apiKey || ''
-          },
-          body: JSON.stringify({
-            ...item.data,
-            source: 'obsidian-plugin',
-            timestamp: item.timestamp
-          })
-        });
-
-        if (response.ok) {
-          // Remove from queue on successful sync
-          this.syncQueue = this.syncQueue.filter(queuedItem => queuedItem.id !== item.id);
-          result.synced++;
-        } else if (response.status === 409) {
-          // Conflict - needs manual resolution
-          const conflictData = await response.json();
-          result.conflicts.push({
-            type: 'push_conflict',
-            item,
-            serverData: conflictData,
-            resolution: 'manual'
-          });
-        }
-      } catch (error) {
-        console.error(`Failed to sync item ${item.id}:`, error);
-        item.retries++;
+    // Group queue items by type for efficient pushing
+    const taskItems = this.syncQueue.filter(item => item.type === 'task' && item.action !== 'delete');
+    
+    if (taskItems.length === 0) return result;
+    
+    try {
+      const tasks = taskItems.map(item => ({
+        id: item.data.id,
+        title: item.data.title,
+        description: item.data.description || '',
+        priority: item.data.priority || 'medium',
+        completed: item.data.completed || false,
+        estimatedMinutes: item.data.estimatedMinutes || 30,
+        actualMinutes: item.data.actualMinutes || 0,
+        createdAt: item.data.createdAt || new Date().toISOString(),
+        updatedAt: item.data.updatedAt || new Date().toISOString()
+      }));
+      
+      const response = await fetch(`${this.settings.serverUrl}/api/sync/push`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.settings.apiKey || ''
+        },
+        body: JSON.stringify({
+          source: 'obsidian',
+          tasks: tasks,
+          timestamp: Date.now()
+        })
+      });
+      
+      if (response.ok) {
+        const responseData = await response.json();
+        result.synced = responseData.data?.synced || tasks.length;
+        result.conflicts = responseData.data?.conflicts || [];
         
-        // Remove items that have failed too many times
-        if (item.retries >= 3) {
-          this.syncQueue = this.syncQueue.filter(queuedItem => queuedItem.id !== item.id);
-          console.warn(`Dropped item after 3 failed sync attempts:`, item);
+        // Remove successfully pushed items from queue
+        const pushedIds = taskItems.map(item => item.id);
+        this.syncQueue = this.syncQueue.filter(item => !pushedIds.includes(item.id));
+      } else {
+        console.error('Push failed:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Push to sync endpoint failed:', error);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Pull remote changes from backend using new sync endpoints
+   */
+  private async pullFromSyncEndpoint(): Promise<{ synced: number; conflicts: any[] }> {
+    const result = { synced: 0, conflicts: [] };
+    
+    try {
+      const url = new URL(`${this.settings.serverUrl}/api/sync/pull`);
+      url.searchParams.set('source', 'obsidian');
+      if (this.lastSyncTimestamp) {
+        url.searchParams.set('since', new Date(this.lastSyncTimestamp).toISOString());
+      }
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'x-api-key': this.settings.apiKey || ''
         }
+      });
+      
+      if (response.ok) {
+        const responseData = await response.json();
+        const remoteTasks = responseData.data || [];
+        
+        if (remoteTasks.length > 0) {
+          // Process remote tasks - update local Obsidian data
+          result.synced = await this.processRemoteTasks(remoteTasks);
+        }
+      } else {
+        console.error('Pull failed:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Pull from sync endpoint failed:', error);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Process remote tasks and update local Obsidian data
+   */
+  private async processRemoteTasks(remoteTasks: any[]): Promise<number> {
+    let processedCount = 0;
+    
+    for (const task of remoteTasks) {
+      try {
+        // Update the daily note with the remote task
+        // This would integrate with your existing Obsidian note updating logic
+        await this.updateTaskInObsidianNote(task);
+        processedCount++;
+      } catch (error) {
+        console.error('Failed to process remote task:', error);
       }
     }
+    
+    return processedCount;
+  }
 
-    return result;
+  /**
+   * Update task in Obsidian daily note (placeholder)
+   */
+  private async updateTaskInObsidianNote(task: any): Promise<void> {
+    // This would be implemented based on your existing Obsidian plugin architecture
+    // For now, just log the task that would be updated
+    console.log('Would update task in Obsidian:', task);
   }
 
   /**

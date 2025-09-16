@@ -46,6 +46,71 @@
       align-items: center;
     }
 
+    .sync-indicator-container {
+      position: relative;
+    }
+
+    .sync-status-tooltip {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: var(--color-gray-900);
+      color: var(--color-gray-0);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      white-space: nowrap;
+      z-index: var(--z-tooltip);
+      margin-top: var(--space-1);
+    }
+
+    .sync-status-tooltip::before {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      right: var(--space-3);
+      border: 4px solid transparent;
+      border-bottom-color: var(--color-gray-900);
+    }
+
+    .sync-last-time {
+      font-size: var(--text-xs);
+      opacity: 0.7;
+      margin-top: var(--space-1);
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .sync-spinner {
+      animation: spin 1s linear infinite;
+    }
+
+    .conflicts-banner {
+      background: var(--color-warning-50);
+      border: 1px solid var(--color-warning-200);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .conflicts-content {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .conflicts-icon {
+      font-size: var(--text-lg);
+    }
+
+    .conflicts-text {
+      flex: 1;
+      color: var(--color-warning-800);
+    }
+
     .view-switcher {
       display: flex;
       background-color: var(--color-gray-100);
@@ -615,12 +680,34 @@
         <button id="ganttViewBtn">📈 Gantt</button>
       </div>
       <button class="btn btn-secondary btn-sm" id="settingsBtn">⚙️ Settings</button>
-      <button class="btn btn-secondary btn-sm" id="syncBtn">🔄 Sync</button>
+      <div class="sync-indicator-container">
+        <button class="btn btn-secondary btn-sm" id="syncBtn">
+          <span id="syncIcon">🔄</span>
+          <span id="syncText">Sync</span>
+        </button>
+        <div class="sync-status-tooltip" id="syncStatus" style="display: none;">
+          <div class="sync-status-content">
+            <div id="syncStatusText">Ready to sync</div>
+            <div id="syncLastTime" class="sync-last-time"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
   <!-- Main Content -->
   <main class="dashboard-content">
+    <!-- Sync Conflicts Banner -->
+    <div id="conflictsBanner" class="conflicts-banner" style="display: none;">
+      <div class="conflicts-content">
+        <span class="conflicts-icon">⚠️</span>
+        <div class="conflicts-text">
+          <strong id="conflictsCount">0</strong> sync conflicts need your attention
+        </div>
+        <button class="btn btn-sm btn-warning" id="resolveConflictsBtn">Resolve Conflicts</button>
+      </div>
+    </div>
+
     <!-- Stats Section -->
     <section class="stats-grid">
       <div class="card stat-card">

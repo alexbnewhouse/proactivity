@@ -802,12 +802,18 @@ class ProactivityBackgroundService {
       // Update local storage
       await chrome.storage.local.set({ tasks });
       
-      // Queue for sync with Obsidian and backend
-      this.syncService.queueForSync({
-        type: 'task_update',
-        data: tasks,
-        timestamp: Date.now()
-      });
+      // Queue individual tasks for sync to minimize merge conflicts
+      if (Array.isArray(tasks)) {
+        tasks.slice(0, 5).forEach(t => { // limit burst size; remaining will be covered by periodic full sync
+          this.syncService.queueForSync({
+            type: 'task_update',
+            data: t,
+            timestamp: Date.now()
+          });
+        });
+      } else {
+        this.syncService.queueForSync({ type: 'task_update', data: tasks, timestamp: Date.now() });
+      }
       
       // Re-check daily todo completion
       await this.checkDailyTodoCompletion();
