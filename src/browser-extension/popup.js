@@ -150,21 +150,8 @@ class ProactivityPopup {
   }
 
   async openTaskView() {
-    // Try to open backend task view first
-    const settings = await chrome.storage.sync.get(['backendUrl']);
-
-    if (settings.backendUrl) {
-      chrome.tabs.create({
-        url: `${settings.backendUrl}/tasks`
-      });
-    } else {
-      // Open local task management page
-      chrome.tabs.create({
-        url: chrome.runtime.getURL('tasks.html')
-      });
-    }
-
-    window.close();
+    // Use unified dashboard for both tasks and dashboard functionality
+    await this.openUnifiedDashboard();
   }
 
   async startBreak() {
@@ -220,16 +207,38 @@ class ProactivityPopup {
   }
 
   async openDashboard() {
-    const settings = await chrome.storage.sync.get(['backendUrl']);
+    // Use unified dashboard for both tasks and dashboard functionality  
+    await this.openUnifiedDashboard();
+  }
+
+  async openUnifiedDashboard() {
+    const settings = await chrome.storage.sync.get(['backendUrl', 'dashboardViewMode']);
 
     if (settings.backendUrl) {
+      // If backend is available, use it
       chrome.tabs.create({
         url: `${settings.backendUrl}/dashboard`
       });
     } else {
-      chrome.tabs.create({
-        url: chrome.runtime.getURL('dashboard.html')
-      });
+      // Use local dashboard
+      const viewMode = settings.dashboardViewMode || 'tab';
+      
+      if (viewMode === 'sidebar') {
+        // Open as sidebar popup window
+        chrome.windows.create({
+          url: chrome.runtime.getURL('dashboard.html'),
+          type: 'popup',
+          width: 380,
+          height: 600,
+          left: screen.width - 400,
+          top: 100
+        });
+      } else {
+        // Open as full tab
+        chrome.tabs.create({
+          url: chrome.runtime.getURL('dashboard.html')
+        });
+      }
     }
 
     window.close();

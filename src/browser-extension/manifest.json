@@ -49,7 +49,7 @@
   "options_page": "options.html",
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png", "options.html", "popup.html", "tasks.html"],
+      "resources": ["icons/*.png", "options.html", "popup.html", "tasks.html", "dashboard.html", "dashboard.js"],
       "matches": ["<all_urls>"]
     }
   ],
