@@ -15,11 +15,26 @@ class ProactivityContentScript {
   }
 
   init() {
+    // Check if we're in a valid frame for script execution
+    if (window.top !== window.self) {
+      // We're in an iframe, skip initialization
+      return;
+    }
+
+    // Check if document is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.init());
+      return;
+    }
+
     this.setupMessageListener();
     this.checkMorningPlanningStatus();
 
     // Don't interfere with Proactivity's own pages unless morning planning is required
     if (this.isProactivityPage && !this.morningPlanningRequired) return;
+
+    // Don't interfere with special browser pages
+    if (this.isSpecialPage()) return;
 
     this.detectPageContent();
     this.startTimeTracking();
@@ -51,8 +66,21 @@ class ProactivityContentScript {
     });
   }
 
+  isSpecialPage() {
+    const url = window.location.href;
+    const specialPages = [
+      'chrome://', 'chrome-extension://', 'moz-extension://', 'vivaldi://',
+      'about:', 'file://', 'data:', 'javascript:', 'blob:'
+    ];
+
+    return specialPages.some(prefix => url.startsWith(prefix));
+  }
+
   async checkMorningPlanningStatus() {
     try {
+      // Don't check status on special pages
+      if (this.isSpecialPage()) return;
+
       // Check with backend if morning planning is required
       const response = await fetch('http://localhost:3001/api/morning-planning/status', {
         credentials: 'include'

@@ -180,34 +180,48 @@ class ProactivityBackgroundService {
   }
 
   async triggerTabSwitchingIntervention() {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0]) {
-      await chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
-        func: this.showTabSwitchingOverlay
-      });
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0] && await this.isTabReady(tabs[0])) {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabs[0].id },
+          func: this.showTabSwitchingOverlay
+        });
+      }
+    } catch (error) {
+      console.log('Tab switching intervention failed:', error);
     }
   }
 
   async triggerProcrastinationIntervention(tab) {
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: this.showProcrastinationOverlay,
-      args: [this.extractDomain(tab.url)]
-    });
+    try {
+      if (await this.isTabReady(tab)) {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: this.showProcrastinationOverlay,
+          args: [this.extractDomain(tab.url)]
+        });
+      }
+    } catch (error) {
+      console.log('Procrastination intervention failed:', error);
+    }
   }
 
   async checkForHyperfocus() {
-    const settings = await chrome.storage.sync.get(['hyperfocusProtection']);
+    try {
+      const settings = await chrome.storage.sync.get(['hyperfocusProtection']);
 
-    if (settings.hyperfocusProtection !== false) {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs[0]) {
-        await chrome.scripting.executeScript({
-          target: { tabId: tabs[0].id },
-          func: this.showHyperfocusReminder
-        });
+      if (settings.hyperfocusProtection !== false) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0] && await this.isTabReady(tabs[0])) {
+          await chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id },
+            func: this.showHyperfocusReminder
+          });
+        }
       }
+    } catch (error) {
+      console.log('Hyperfocus check failed:', error);
     }
   }
 
@@ -346,6 +360,32 @@ class ProactivityBackgroundService {
   }
 
   // Helper methods
+  async isTabReady(tab) {
+    try {
+      // Check if tab is ready for script injection
+      if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') ||
+          tab.url.startsWith('moz-extension://') || tab.url.startsWith('vivaldi://') ||
+          tab.url.startsWith('about:') || tab.url.startsWith('file://')) {
+        return false;
+      }
+
+      // Check if tab status is complete
+      if (tab.status && tab.status !== 'complete') {
+        return false;
+      }
+
+      // Additional check for Vivaldi and other Chromium browsers
+      if (tab.discarded) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.log('Tab readiness check failed:', error);
+      return false;
+    }
+  }
+
   extractDomain(url) {
     try {
       return new URL(url).hostname.replace('www.', '');

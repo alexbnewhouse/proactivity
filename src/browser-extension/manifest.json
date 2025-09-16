@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Proactivity Focus Assistant",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered ADHD-friendly focus assistant that gently guides you back to your important tasks",
   "permissions": [
     "activeTab",
@@ -9,19 +9,32 @@
     "storage",
     "notifications",
     "alarms",
-    "scripting"
+    "scripting",
+    "webRequest"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "exclude_matches": [
+        "*://chrome.google.com/*",
+        "*://chromewebstore.google.com/*",
+        "*://vivaldi.com/*",
+        "*://vivaldi.net/*"
+      ],
       "js": ["content.js"],
-      "css": ["content.css"]
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "action": {
@@ -33,5 +46,15 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.png", "options.html", "popup.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "minimum_chrome_version": "88",
+  "externally_connectable": {
+    "matches": ["*://localhost/*", "*://127.0.0.1/*"]
+  }
 }

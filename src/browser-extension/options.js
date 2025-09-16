@@ -14,14 +14,46 @@ const defaultSettings = {
 
 // Initialize options page
 document.addEventListener('DOMContentLoaded', async () => {
+    showBrowserCompatibilityInfo();
     await loadSettings();
     setupEventListeners();
 });
 
+// Detect browser type for compatibility
+function getBrowserInfo() {
+    const userAgent = navigator.userAgent;
+    const isVivaldi = userAgent.includes('Vivaldi');
+    const isChrome = userAgent.includes('Chrome') && !isVivaldi;
+    const isEdge = userAgent.includes('Edg');
+
+    return { isVivaldi, isChrome, isEdge };
+}
+
+// Show browser compatibility information
+function showBrowserCompatibilityInfo() {
+    const browserInfo = getBrowserInfo();
+    const header = document.querySelector('header p');
+
+    if (browserInfo.isVivaldi) {
+        header.innerHTML = 'Configure your ADHD-friendly productivity settings<br><small style="color: #ffeb3b;">✨ Vivaldi detected - using enhanced compatibility mode</small>';
+    } else if (browserInfo.isEdge) {
+        header.innerHTML = 'Configure your ADHD-friendly productivity settings<br><small style="color: #90caf9;">🔷 Microsoft Edge detected - full compatibility</small>';
+    } else if (browserInfo.isChrome) {
+        header.innerHTML = 'Configure your ADHD-friendly productivity settings<br><small style="color: #81c784;">✅ Chrome detected - full compatibility</small>';
+    }
+}
+
 // Load settings from Chrome storage
 async function loadSettings() {
     try {
-        const settings = await chrome.storage.sync.get(defaultSettings);
+        // Use local storage as fallback for Vivaldi compatibility
+        let settings;
+        try {
+            settings = await chrome.storage.sync.get(defaultSettings);
+        } catch (syncError) {
+            console.log('Sync storage not available, using local storage:', syncError);
+            settings = await chrome.storage.local.get(defaultSettings);
+        }
 
         // Populate form fields
         document.getElementById('morningEnforcement').checked = settings.morningEnforcement;
@@ -54,14 +86,25 @@ async function saveSettings() {
             serverUrl: document.getElementById('serverUrl').value.trim()
         };
 
-        await chrome.storage.sync.set(settings);
+        // Try sync storage first, fallback to local for Vivaldi
+        try {
+            await chrome.storage.sync.set(settings);
+        } catch (syncError) {
+            console.log('Sync storage failed, using local storage:', syncError);
+            await chrome.storage.local.set(settings);
+        }
+
         showStatus('saveStatus', 'Settings saved successfully!', 'success');
 
         // Notify background script of settings change
-        chrome.runtime.sendMessage({
-            action: 'settingsUpdated',
-            settings: settings
-        });
+        try {
+            chrome.runtime.sendMessage({
+                action: 'settingsUpdated',
+                settings: settings
+            });
+        } catch (messageError) {
+            console.log('Could not notify background script:', messageError);
+        }
 
     } catch (error) {
         console.error('Error saving settings:', error);
