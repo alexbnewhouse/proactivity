@@ -1,0 +1,40 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Build plugin
+      run: |
+        cd dissertation-support
+        npm install
+        npm run build
+        
+    - name: Create release package
+      run: |
+        cd dissertation-support
+        zip -r ../dissertation-support-${{ github.ref_name }}.zip manifest.json main.js README.md
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dissertation-support-${{ github.ref_name }}.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

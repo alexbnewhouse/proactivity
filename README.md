@@ -1,116 +1,228 @@
-# Proactivity
+# Dissertation Support - Obsidian Plugin# Proactivity
 
-[![CI/CD Pipeline](https://github.com/alexbnewhouse/proactivity/actions/workflows/ci.yml/badge.svg)](https://github.com/alexbnewhouse/proactivity/actions/workflows/ci.yml)
 
-A proactive AI assistant designed specifically for ADHD-focused productivity, featuring computer hijacking interventions, comprehensive Obsidian integration, and cutting-edge behavioral research implementation.
 
-## 🚀 Recent Updates
+A minimal, ADHD-friendly Obsidian plugin that provides proactive reminders and AI-powered planning for dissertation writing.[![CI/CD Pipeline](https://github.com/alexbnewhouse/proactivity/actions/workflows/ci.yml/badge.svg)](https://github.com/alexbnewhouse/proactivity/actions/workflows/ci.yml)
 
-### Enhanced Sync System (v2.0)
+
+
+## 🎯 The Problem It SolvesA proactive AI assistant designed specifically for ADHD-focused productivity, featuring computer hijacking interventions, comprehensive Obsidian integration, and cutting-edge behavioral research implementation.
+
+
+
+Traditional productivity apps require you to actively open them and start working - exactly what's hardest for ADHD brains. This plugin brings gentle nudges directly to you in your writing environment, making it easier to just... start.## 🚀 Recent Updates
+
+
+
+## ✨ Features### Enhanced Sync System (v2.0)
+
 - ✅ **Visual Sync Indicators**: Real-time sync status with animated feedback
-- ✅ **Optimized Performance**: Smart task filtering to reduce redundant syncs
-- ✅ **Conflict Resolution UI**: Interactive modal for resolving sync conflicts
-- ✅ **Integration Testing**: Comprehensive end-to-end test suite
-- ✅ **Cross-Platform Compatibility**: Seamless sync between extension and Obsidian
+
+### 🔔 Proactive Reminders- ✅ **Optimized Performance**: Smart task filtering to reduce redundant syncs
+
+- Gentle, configurable reminders that appear automatically (default: every hour)- ✅ **Conflict Resolution UI**: Interactive modal for resolving sync conflicts
+
+- Messages like "🎓 Ready for 15 minutes of dissertation work?"- ✅ **Integration Testing**: Comprehensive end-to-end test suite
+
+- No overwhelming asks - just gentle nudges to get started- ✅ **Cross-Platform Compatibility**: Seamless sync between extension and Obsidian
+
 - ✅ **CI/CD Pipeline**: Automated testing and deployment validation
 
-## Overview
+### 🤖 AI-Powered Planning
 
-Proactivity leverages the latest research in ADHD cognitive behavioral interventions, AI-powered productivity assistance, and academic writing workflow optimization. Unlike traditional productivity apps that require users to remember to use them, Proactivity anticipates needs and intervenes proactively with gentle, ADHD-friendly guidance.
+- One-time setup using OpenAI's GPT-4## Overview
+
+- Breaks down your dissertation topic into ADHD-friendly micro-tasks
+
+- Generates structured markdown files with realistic timelinesProactivity leverages the latest research in ADHD cognitive behavioral interventions, AI-powered productivity assistance, and academic writing workflow optimization. Unlike traditional productivity apps that require users to remember to use them, Proactivity anticipates needs and intervenes proactively with gentle, ADHD-friendly guidance.
+
+- Focus on specific, concrete actions instead of vague goals
 
 ## 🚀 Quick Start
 
-**Get started in 30 seconds:**
+### 🎨 Minimal Interface
 
-```bash
+- Works through simple notifications and commands**Get started in 30 seconds:**
+
+- No complex dashboards to manage
+
+- Everything stays within Obsidian - no external apps```bash
+
 # One-command setup
-./setup-dev.sh
 
-# Start everything
-./start-all.sh
-```
+## 🚀 Quick Start./setup-dev.sh
 
-See [QUICK_START.md](QUICK_START.md) for detailed setup options.
 
-## 🎯 Three Ways to Use Proactivity
 
-### 1. Browser Extension Only (Immediate Use)
-**Perfect for instant procrastination help and focus tracking**
+1. **Download** the latest release from the [Releases page](../../releases)# Start everything
 
-- **Setup**: 30 seconds to load extension in browser
+2. **Install** by copying files to `.obsidian/plugins/dissertation-support/` in your vault./start-all.sh
+
+3. **Enable** the plugin in Obsidian's Community Plugins settings```
+
+4. **Configure** your settings:
+
+   - Add your OpenAI API keySee [QUICK_START.md](QUICK_START.md) for detailed setup options.
+
+   - Enter your dissertation topic
+
+   - Set your deadline (optional)## 🎯 Three Ways to Use Proactivity
+
+   - Choose reminder interval (default: 60 minutes)
+
+5. **Generate your plan** using the "Plan my dissertation with AI" command### 1. Browser Extension Only (Immediate Use)
+
+6. **Let the reminders work** - they'll start automatically**Perfect for instant procrastination help and focus tracking**
+
+
+
+## 🛠 Commands- **Setup**: 30 seconds to load extension in browser
+
 - **Features**: Gentle interventions, tab switching awareness, hyperfocus protection
-- **Best for**: Anyone who wants immediate ADHD-friendly browsing guidance
 
-### 2. Full Backend System (5 minutes)
+- **Plan my dissertation with AI** - Generate a structured dissertation plan- **Best for**: Anyone who wants immediate ADHD-friendly browsing guidance
+
+- **Toggle proactive reminders** - Enable/disable automatic reminders
+
+- Click the 🧠 **brain icon** in the ribbon for quick access### 2. Full Backend System (5 minutes)
+
 **For AI-powered task breakdown and cross-device sync**
 
-- **Setup**: Run setup script, add API key, start services
-- **Features**: Everything + AI task breakdown, pattern learning, dashboard
-- **Best for**: Complete productivity management across all devices
+## 📁 Installation
 
-### 3. Obsidian Plugin (Research/Writing)
+- **Setup**: Run setup script, add API key, start services
+
+### Method 1: Manual Installation- **Features**: Everything + AI task breakdown, pattern learning, dashboard
+
+1. Download the latest release- **Best for**: Complete productivity management across all devices
+
+2. Extract to `.obsidian/plugins/dissertation-support/` in your vault
+
+3. Enable in Settings > Community Plugins### 3. Obsidian Plugin (Research/Writing)
+
 **For dissertation and academic work**
 
-- **Setup**: Copy plugin to vault, enable in settings
-- **Features**: Smart note integration, writing progress tracking, research workflows
-- **Best for**: Students, researchers, academic writers
+### Method 2: BRAT (Beta Reviewer's Auto-update Tool)
 
-## Key Features
+1. Install BRAT plugin- **Setup**: Copy plugin to vault, enable in settings
 
-### 🧠 **Computer Hijacking & Gentle Interventions**
-- **Procrastination Detection**: Notices when you're on distracting sites and offers gentle nudges
-- **Tab Switching Awareness**: Helps when you're rapidly jumping between tasks (classic ADHD!)
-- **True Bidirectional Sync**: Complete synchronization between browser extension and Obsidian plugin
-- **Cross-Platform Consistency**: Tasks, energy levels, and AI breakdowns stay in sync everywhere
+2. Add `alexbnewhouse/proactivity` as a beta plugin- **Features**: Smart note integration, writing progress tracking, research workflows
+
+3. Enable Dissertation Support in Community Plugins- **Best for**: Students, researchers, academic writers
+
+
+
+## ⚙️ Settings## Key Features
+
+
+
+- **Reminder Interval**: How often to show reminders (in minutes)### 🧠 **Computer Hijacking & Gentle Interventions**
+
+- **OpenAI API Key**: Your API key for AI planning features- **Procrastination Detection**: Notices when you're on distracting sites and offers gentle nudges
+
+- **Dissertation Topic**: What your dissertation is about- **Tab Switching Awareness**: Helps when you're rapidly jumping between tasks (classic ADHD!)
+
+- **Deadline**: When your dissertation is due- **True Bidirectional Sync**: Complete synchronization between browser extension and Obsidian plugin
+
+- **Proactive Reminders**: Toggle automatic reminders on/off- **Cross-Platform Consistency**: Tasks, energy levels, and AI breakdowns stay in sync everywhere
+
 - **Hyperfocus Protection**: Reminds you to take breaks during extended work sessions
-- **Context-Aware Suggestions**: Understands what you're working on and suggests next steps
+
+## 🔒 Privacy & Security- **Context-Aware Suggestions**: Understands what you're working on and suggests next steps
+
 - **Energy-Matched Tasks**: Only suggests tasks that match your current mental state
 
-### ⚡ **Executive Function Augmentation**
-- AI-powered task breakdown for overwhelming projects
-- Working memory support through visual synthesis
-- Cognitive load balancing based on current capacity
-- Smart "next best action" recommendations
+- Your API key is stored locally in Obsidian only
 
-### 🎯 **ADHD-Specific Design**
-- **Gentle, Non-Judgmental Language**: "Let's refocus" instead of "You're distracted"
-- **Micro-Task Breakdown**: 5-25 minute tasks to reduce initiation friction
-- **Energy Level Awareness**: High-energy tasks when alert, simple tasks when depleted
-- **Pattern Recognition**: Learns your productivity rhythms and works with them
+- AI planning requests go directly to OpenAI - no external servers involved### ⚡ **Executive Function Augmentation**
+
+- All generated plans are saved as markdown files in your vault- AI-powered task breakdown for overwhelming projects
+
+- Reminder data stays completely local to your Obsidian installation- Working memory support through visual synthesis
+
+- Cognitive load balancing based on current capacity
+
+## 🎭 Example Reminders- Smart "next best action" recommendations
+
+
+
+Instead of overwhelming productivity pressure, you get gentle nudges:### 🎯 **ADHD-Specific Design**
+
+- "✍️ How about opening your dissertation document?"- **Gentle, Non-Judgmental Language**: "Let's refocus" instead of "You're distracted"
+
+- "📚 Time for a quick writing session?"- **Micro-Task Breakdown**: 5-25 minute tasks to reduce initiation friction
+
+- "🔍 Want to review what you wrote yesterday?"- **Energy Level Awareness**: High-energy tasks when alert, simple tasks when depleted
+
+- "💭 Ready to add just one paragraph?"- **Pattern Recognition**: Learns your productivity rhythms and works with them
+
+- "📝 How about outlining your next section?"
 
 ### 📝 **Deep Obsidian Integration**
-- Smart note synthesis and automatic connection creation
+
+## 🗓 Roadmap- Smart note synthesis and automatic connection creation
+
 - Progress visualization and writing session tracking
-- Research workflow automation
-- ADHD-friendly daily note templates
 
-### 🤝 **Behavioral Support System**
-- Virtual body doubling for accountability
-- CBT-based cognitive restructuring for avoidance patterns
+Future enhancements based on user feedback:- Research workflow automation
+
+- [ ] Context preservation (remembering where you left off)- ADHD-friendly daily note templates
+
+- [ ] Daily planning automation
+
+- [ ] Simple progress tracking### 🤝 **Behavioral Support System**
+
+- [ ] Integration with daily notes- Virtual body doubling for accountability
+
+- [ ] Micro-commitment escalation system- CBT-based cognitive restructuring for avoidance patterns
+
 - Celebration and positive reinforcement features
-- Out-of-office modes for genuine rest
 
-## 🌐 Browser Extension Features
+## 🤝 Contributing- Out-of-office modes for genuine rest
 
-### Immediate Interventions
-- **Procrastination Sites**: Gentle overlay when you've been on YouTube/Reddit/etc for 5+ minutes
-- **Focus Mode**: Block distracting sites during work sessions
-- **Tab Chaos Management**: Notice when you're switching tabs rapidly and offer focus help
 
-### Smart Notifications
+
+This plugin is built specifically for ADHD minds who need proactive support. If you have suggestions or improvements, please:## 🌐 Browser Extension Features
+
+
+
+1. Open an issue to discuss the idea### Immediate Interventions
+
+2. Fork the repository- **Procrastination Sites**: Gentle overlay when you've been on YouTube/Reddit/etc for 5+ minutes
+
+3. Create a feature branch- **Focus Mode**: Block distracting sites during work sessions
+
+4. Submit a pull request- **Tab Chaos Management**: Notice when you're switching tabs rapidly and offer focus help
+
+
+
+## 📄 License### Smart Notifications
+
 - **Energy Check-ins**: "How's your energy level right now?"
-- **Break Reminders**: After 90+ minutes of continuous work
+
+MIT License - see LICENSE file for details- **Break Reminders**: After 90+ minutes of continuous work
+
 - **Task Transitions**: "Ready to move to your next planned task?"
 
+## 🙏 Support
+
 ### Popup Interface
-- **Current Energy Level**: ⚡ High, 🔋 Moderate, 🪫 Low, 😴 Depleted
-- **Quick Actions**: Start focus session, view tasks, take break
-- **Today's Stats**: Focus time, tab switches, break time
-- **Intervention Settings**: Customize which helps you want
 
-## 🧠 Obsidian Plugin Features
+If this plugin helps your dissertation progress, consider:- **Current Energy Level**: ⚡ High, 🔋 Moderate, 🪫 Low, 😴 Depleted
 
-### Main Interface Panel
+- ⭐ Starring the repository- **Quick Actions**: Start focus session, view tasks, take break
+
+- 🐛 Reporting bugs or requesting features- **Today's Stats**: Focus time, tab switches, break time
+
+- 💬 Sharing your experience with other ADHD academics- **Intervention Settings**: Customize which helps you want
+
+
+
+---## 🧠 Obsidian Plugin Features
+
+
+
+**Built by someone with ADHD, for people with ADHD. Because we need tools that work with our brains, not against them.**### Main Interface Panel
 - **Energy-Based Task Suggestions**: Tasks matched to your current mental state
 - **AI Task Breakdown**: Turn overwhelming tasks into manageable micro-steps
 - **Progress Tracking**: Visual progress bars and achievement stats
