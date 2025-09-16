@@ -23,6 +23,17 @@ export const EnergyLevel = {
 };
 
 /**
+ * Task status for Kanban/Gantt tracking
+ */
+export const TaskStatus = {
+  TODO: 'todo',
+  IN_PROGRESS: 'in-progress',
+  BLOCKED: 'blocked',
+  REVIEW: 'review',
+  DONE: 'done'
+};
+
+/**
  * Executive function domains from ADHD research
  */
 export const ExecutiveFunction = {
@@ -47,6 +58,64 @@ export const TaskCategory = {
   ADMINISTRATIVE: 'administrative', // Emails, scheduling
   CREATIVE: 'creative',           // Brainstorming, ideation
   REVISION: 'revision'            // Editing, proofreading
+};
+
+/**
+ * Enhanced Task structure with time tracking for Gantt charts
+ */
+export const TaskTemplate = {
+  id: '',                    // Unique identifier
+  title: '',                 // Task title
+  description: '',           // Detailed description
+  status: TaskStatus.TODO,   // Current status
+  priority: 'medium',        // low, medium, high, urgent
+  complexity: TaskComplexity.MODERATE,
+  category: TaskCategory.WRITING,
+  
+  // Time tracking for Gantt charts
+  startTime: null,          // ISO string or null
+  endTime: null,            // ISO string or null
+  scheduledStartTime: null, // Planned start time
+  scheduledEndTime: null,   // Planned end time
+  estimatedMinutes: 30,     // Estimated duration
+  actualMinutes: 0,         // Tracked time spent
+  
+  // Metadata
+  energyLevel: EnergyLevel.MODERATE,
+  createdAt: '',            // ISO string
+  updatedAt: '',            // ISO string
+  completedAt: null,        // ISO string or null
+  
+  // ADHD-specific
+  procrastinationScore: 0,  // 0-10
+  motivationBooster: '',    // Encouraging message
+  adhdOptimized: false,     // Has been processed for ADHD
+  
+  // Sync metadata
+  source: 'manual',         // manual, obsidian, ai
+  syncStatus: 'synced',     // synced, pending, conflict
+  lastSyncTime: '',         // ISO string
+  
+  // Dependencies for Gantt
+  dependencies: [],         // Array of task IDs
+  blocked: false,           // Is task blocked
+  blockingReason: ''        // Why task is blocked
+};
+
+/**
+ * Sync configuration between extension and Obsidian
+ */
+export const SyncConfig = {
+  enableRealTimeSync: true,
+  syncIntervalMinutes: 5,
+  conflictResolution: 'manual', // manual, extension-wins, obsidian-wins
+  syncComponents: {
+    tasks: true,
+    energyLevels: true,
+    focusSessions: true,
+    settings: true,
+    patterns: true
+  }
 };
 
 /**

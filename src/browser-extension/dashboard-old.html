@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proactivity Dashboard</title>
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      /* Modern design system - inspired by Notion/Todoist/Superhuman */
+      --p-primary: #6366f1;
+      --p-primary-hover: #5b5bd6;
+      --p-primary-light: #eef2ff;
+      --p-success: #10b981;
+      --p-success-light: #ecfdf5;
+      --p-warning: #f59e0b;
+      --p-warning-light: #fffbeb;
+      --p-danger: #ef4444;
+      --p-danger-light: #fef2f2;
+      --p-gray-50: #f9fafb;
+      --p-gray-100: #f3f4f6;
+      --p-gray-200: #e5e7eb;
+      --p-gray-300: #d1d5db;
+      --p-gray-400: #9ca3af;
+      --p-gray-500: #6b7280;
+      --p-gray-600: #4b5563;
+      --p-gray-700: #374151;
+      --p-gray-800: #1f2937;
+      --p-gray-900: #111827;
+      --p-radius: 8px;
+      --p-radius-sm: 6px;
+      --p-radius-lg: 12px;
+      --p-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+      --p-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --p-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --p-transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      --sidebar-width: 380px;
+      --header-height: 60px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Inter', sans-serif;
+      background: var(--p-gray-50);
+      color: var(--p-gray-900);
+      line-height: 1.6;
+      font-size: 14px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      display: flex;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* View Mode Toggle */
+    .view-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: white;
+      border: 2px solid var(--p-gray-200);
+      border-radius: var(--p-radius);
+      padding: 8px;
+      box-shadow: var(--p-shadow);
+    }
+
+    .view-toggle button {
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      margin: 0 2px;
+      cursor: pointer;
+      border-radius: var(--p-radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      transition: var(--p-transition);
+      color: var(--p-gray-500);
+    }
+
+    .view-toggle button.active {
+      background: var(--p-primary);
+      color: white;
+    }
+
+    .view-toggle button:hover:not(.active) {
+      background: var(--p-gray-100);
+      color: var(--p-gray-700);
+    }
+
+    /* Sidebar Mode */
+    .sidebar-mode {
+      width: var(--sidebar-width);
+      max-width: 100vw;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-mode .main-content {
+      padding: 16px 12px;
+    }
+
+    .sidebar-mode .stats-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .sidebar-mode .stat-card {
+      padding: 10px 8px;
+    }
+
+    .sidebar-mode .energy-buttons {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .sidebar-mode .energy-btn {
+      font-size: 12px;
+      padding: 10px 8px;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Sidebar-specific text improvements */
+    .sidebar-mode .task-text {
+      font-size: 13px;
+      line-height: 1.4;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .sidebar-mode .task-priority {
+      font-size: 10px;
+      padding: 1px 6px;
+    }
+
+    .sidebar-mode .task-item {
+      padding: 8px 12px;
+      gap: 8px;
+    }
+
+    .sidebar-mode h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-mode h3 {
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    /* Tab Mode */
+    .tab-mode {
+      width: 100vw;
+      min-height: 100vh;
+    }
+
+    .tab-mode .main-content {
+      padding: 30px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      background: white;
+      border-bottom: 1px solid var(--p-gray-200);
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--p-gray-900);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-secondary {
+      background: var(--p-gray-100);
+      border: 1px solid var(--p-gray-200);
+      color: var(--p-gray-900);
+      padding: 8px 16px;
+      border-radius: var(--p-radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--p-transition);
+    }
+
+    .btn-secondary:hover {
+      background: var(--p-gray-200);
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Stats Section */
+    .stats-section {
+      margin-bottom: 30px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      border: 1px solid var(--p-gray-200);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: var(--p-shadow);
+      transition: var(--p-transition);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--p-primary);
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--p-gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Energy Level */
+    .energy-section {
+      background: white;
+      border: 1px solid var(--p-gray-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+      box-shadow: var(--p-shadow);
+    }
+
+    .energy-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+
+    .energy-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--p-gray-900);
+    }
+
+    .current-energy {
+      font-size: 14px;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 16px;
+      background: var(--p-primary);
+      color: white;
+    }
+
+    .energy-buttons {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .energy-btn {
+      background: var(--p-gray-100);
+      border: 2px solid transparent;
+      color: var(--p-gray-900);
+      padding: 12px 8px;
+      border-radius: var(--p-radius);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: var(--p-transition);
+    }
+
+    .energy-btn:hover {
+      background: var(--p-gray-200);
+      transform: translateY(-1px);
+    }
+
+    .energy-btn.active {
+      border-color: var(--p-primary);
+      background: var(--p-primary);
+      color: white;
+      box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+    }
+
+    /* Tasks Section */
+    .tasks-section {
+      background: white;
+      border: 1px solid var(--p-gray-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+      box-shadow: var(--p-shadow);
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--p-gray-900);
+    }
+
+    .btn-primary {
+      background: var(--p-primary);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: var(--p-radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--p-transition);
+    }
+
+    .btn-primary:hover {
+      background: #3A7BD5;
+      transform: translateY(-1px);
+    }
+
+    /* Task Input */
+    .task-input-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .task-input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--p-gray-200);
+      border-radius: var(--p-radius-sm);
+      font-size: 14px;
+      background: var(--p-gray-100);
+      transition: var(--p-transition);
+    }
+
+    .task-input:focus {
+      outline: none;
+      border-color: var(--p-primary);
+      background: white;
+      box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+    }
+
+    .task-input::placeholder {
+      color: var(--p-gray-500);
+    }
+
+    /* Task List */
+    .tasks-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--p-gray-100);
+      transition: var(--p-transition);
+    }
+
+    .task-item:last-child {
+      border-bottom: none;
+    }
+
+    .task-item:hover {
+      background: var(--p-gray-100);
+      margin: 0 -10px;
+      padding-left: 10px;
+      padding-right: 10px;
+      border-radius: var(--p-radius-sm);
+    }
+
+    .task-checkbox {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--p-gray-200);
+      border-radius: var(--p-radius-sm);
+      cursor: pointer;
+      position: relative;
+      background: white;
+      transition: var(--p-transition);
+    }
+
+    .task-checkbox.completed {
+      background: var(--p-success);
+      border-color: var(--p-success);
+    }
+
+    .task-checkbox.completed::after {
+      content: '✓';
+      position: absolute;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .task-text {
+      flex: 1;
+      font-size: 14px;
+      color: var(--p-gray-900);
+      transition: var(--p-transition);
+    }
+
+    .task-text.completed {
+      text-decoration: line-through;
+      color: var(--p-gray-500);
+    }
+
+    .task-priority {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .task-priority.high {
+      background: rgba(208, 2, 27, 0.1);
+      color: var(--p-danger);
+    }
+
+    .task-priority.medium {
+      background: rgba(245, 166, 35, 0.1);
+      color: var(--p-warning);
+    }
+
+    .task-priority.low {
+      background: rgba(126, 211, 33, 0.1);
+      color: var(--p-success);
+    }
+
+    .task-actions {
+      display: flex;
+      gap: 5px;
+      opacity: 0;
+      transition: var(--p-transition);
+    }
+
+    .task-item:hover .task-actions {
+      opacity: 1;
+    }
+
+    .task-action-btn {
+      background: none;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      border-radius: var(--p-radius-sm);
+      color: var(--p-gray-500);
+      transition: var(--p-transition);
+    }
+
+    .task-action-btn:hover {
+      background: var(--p-gray-200);
+      color: var(--p-gray-900);
+    }
+
+    /* Focus Session */
+    .focus-session {
+      background: white;
+      border: 1px solid var(--p-gray-200);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+      box-shadow: var(--p-shadow);
+    }
+
+    .focus-timer {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .timer-display {
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--p-primary);
+      margin-bottom: 10px;
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+    }
+
+    .timer-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 15px;
+    }
+
+    /* Enforcement Testing */
+    .enforcement-section {
+      background: white;
+      border: 1px solid var(--p-gray-200);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: var(--p-shadow);
+    }
+
+    .enforcement-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .enforcement-card {
+      background: var(--p-gray-100);
+      border: 1px solid var(--p-gray-200);
+      border-radius: var(--p-radius);
+      padding: 15px;
+    }
+
+    .enforcement-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--p-gray-900);
+    }
+
+    .enforcement-card p {
+      font-size: 12px;
+      color: var(--p-gray-500);
+      margin-bottom: 12px;
+    }
+
+    .btn-test {
+      background: var(--p-warning);
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      transition: var(--p-transition);
+    }
+
+    .btn-test:hover {
+      background: #E6941A;
+      transform: translateY(-1px);
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--p-gray-500);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--p-gray-900);
+    }
+
+    .empty-state-text {
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      
+      .energy-buttons {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      
+      .enforcement-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .view-toggle {
+        right: 10px;
+        top: 10px;
+      }
+
+      .main-content {
+        padding: 20px 15px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .energy-buttons {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .task-input-container {
+        flex-direction: column;
+      }
+
+      .timer-display {
+        font-size: 36px;
+      }
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.05);
+      }
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--p-gray-100);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--p-gray-200);
+      border-radius: var(--p-radius-sm);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--p-gray-500);
+    }
+  </style>
+</head>
+<body>
+  <!-- View Mode Toggle -->
+  <div class="view-toggle">
+    <button id="sidebarMode" class="active">Sidebar</button>
+    <button id="tabMode">Full Tab</button>
+  </div>
+
+  <div class="container sidebar-mode" id="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Proactivity Dashboard</h1>
+      <div class="header-actions">
+        <button class="btn-secondary" id="settingsBtn">Settings</button>
+        <button class="btn-secondary" id="syncBtn">Sync</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="totalTasks">0</div>
+            <div class="stat-label">Total Tasks</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="completedTasks">0</div>
+            <div class="stat-label">Completed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="focusTime">0m</div>
+            <div class="stat-label">Focus Time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="streakDays">0</div>
+            <div class="stat-label">Streak Days</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Energy Level Section -->
+      <div class="energy-section">
+        <div class="energy-header">
+          <h3 class="energy-title">Current Energy Level</h3>
+          <div class="current-energy" id="currentEnergyDisplay">Medium</div>
+        </div>
+        <div class="energy-buttons">
+          <button class="energy-btn" data-energy="1">
+            <div>😴</div>
+            <div>Very Low</div>
+          </button>
+          <button class="energy-btn" data-energy="2">
+            <div>😐</div>
+            <div>Low</div>
+          </button>
+          <button class="energy-btn active" data-energy="3">
+            <div>🙂</div>
+            <div>Medium</div>
+          </button>
+          <button class="energy-btn" data-energy="4">
+            <div>😊</div>
+            <div>High</div>
+          </button>
+          <button class="energy-btn" data-energy="5">
+            <div>🚀</div>
+            <div>Very High</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Focus Session -->
+      <div class="focus-session">
+        <div class="section-header">
+          <h3 class="section-title">Focus Session</h3>
+        </div>
+        <div class="focus-timer">
+          <div class="timer-display" id="timerDisplay">25:00</div>
+          <div class="timer-controls">
+            <button class="btn-primary" id="startTimer">Start Focus</button>
+            <button class="btn-secondary" id="pauseTimer" style="display: none;">Pause</button>
+            <button class="btn-secondary" id="stopTimer" style="display: none;">Stop</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks Section -->
+      <div class="tasks-section">
+        <div class="section-header">
+          <h3 class="section-title">Tasks</h3>
+          <button class="btn-primary" id="addTaskBtn">Add Task</button>
+        </div>
+
+        <div class="task-input-container" id="taskInputContainer" style="display: none;">
+          <input type="text" class="task-input" id="taskInput" placeholder="Enter a new task...">
+          <select class="task-input" id="taskPriority" style="flex: 0 0 100px;">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+          <button class="btn-primary" id="saveTaskBtn">Save</button>
+          <button class="btn-secondary" id="cancelTaskBtn">Cancel</button>
+        </div>
+
+        <div class="tasks-list" id="tasksList">
+          <!-- Tasks will be populated here -->
+        </div>
+
+        <div class="empty-state" id="emptyState" style="display: none;">
+          <div class="empty-state-icon">📝</div>
+          <div class="empty-state-title">No tasks yet</div>
+          <div class="empty-state-text">Add your first task to get started with productivity tracking</div>
+          <button class="btn-primary" id="addFirstTaskBtn">Add Your First Task</button>
+        </div>
+      </div>
+
+      <!-- Enforcement Testing Section -->
+      <div class="enforcement-section">
+        <div class="section-header">
+          <h3 class="section-title">Enforcement Testing</h3>
+        </div>
+        <div class="enforcement-grid">
+          <div class="enforcement-card">
+            <h4>🔔 Notification System</h4>
+            <p>Test proactive notifications and reminders</p>
+            <button class="btn-test" id="testNotifications">Trigger Notification</button>
+          </div>
+          <div class="enforcement-card">
+            <h4>⚡ Focus Interruption</h4>
+            <p>Test focus session protection mechanisms</p>
+            <button class="btn-test" id="testFocusInterruption">Test Focus Block</button>
+          </div>
+          <div class="enforcement-card">
+            <h4>📊 Pattern Detection</h4>
+            <p>Test ADHD pattern recognition and suggestions</p>
+            <button class="btn-test" id="testPatternDetection">Analyze Patterns</button>
+          </div>
+          <div class="enforcement-card">
+            <h4>🎯 Task Breakdown</h4>
+            <p>Test AI-powered task decomposition</p>
+            <button class="btn-test" id="testTaskBreakdown">Break Down Task</button>
+          </div>
+          <div class="enforcement-card">
+            <h4>⏰ Time Tracking</h4>
+            <p>Test productivity time tracking and analysis</p>
+            <button class="btn-test" id="testTimeTracking">Track Session</button>
+          </div>
+          <div class="enforcement-card">
+            <h4>🚨 Urgency Detection</h4>
+            <p>Test urgency-based task prioritization</p>
+            <button class="btn-test" id="testUrgencyDetection">Detect Urgency</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="theme-manager.js"></script>
+  <script src="dashboard.js"></script>
+  <script>
+    // Initialize theme toggle in header after DOM loads
+    document.addEventListener('DOMContentLoaded', () => {
+      window.themeManager.initializeThemeToggle('.header-actions');
+    });
+  </script>
+</body>
+</html>

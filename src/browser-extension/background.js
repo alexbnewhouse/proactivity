@@ -1,6 +1,9 @@
 // Proactivity Browser Extension - Background Service Worker
 // Monitors browsing patterns and triggers ADHD-friendly interventions
 
+// Import sync service
+importScripts('sync-service.js');
+
 class ProactivityBackgroundService {
   constructor() {
     this.currentSession = {
@@ -9,7 +12,9 @@ class ProactivityBackgroundService {
       procrastinationTime: 0,
       focusTime: 0,
       lastActiveTab: null,
-      activeTabStartTime: Date.now()
+      activeTabStartTime: Date.now(),
+      remainingMinutes: 25,
+      remainingSeconds: 0
     };
 
     this.procrastinationSites = [
@@ -29,10 +34,23 @@ class ProactivityBackgroundService {
     this.allowedDomains = ['chrome://settings', 'chrome://extensions', 'localhost'];
     this.hasCompletedDailyTodo = false;
 
+    // Initialize sync service
+    this.syncService = new ProactivitySyncService();
+
     this.setupEventListeners();
     this.startMonitoring();
     this.setupMessageHandlers();
     this.initializeEnforcement();
+    this.initializeSync();
+  }
+
+  async initializeSync() {
+    try {
+      await this.syncService.init();
+      console.log('Sync service initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize sync service:', error);
+    }
   }
 
   async initializeEnforcement() {
@@ -125,6 +143,23 @@ class ProactivityBackgroundService {
         case 'getUrgentTasks':
           this.getUrgentTasks().then(sendResponse);
           return true; // Keep channel open for async response
+        
+        // Sync-related message handlers
+        case 'fullSync':
+          this.syncService.performFullSync().then(sendResponse);
+          return true;
+        case 'updateTasks':
+          this.handleTasksUpdate(message.tasks).then(sendResponse);
+          return true;
+        case 'updateEnergyLevel':
+          this.handleEnergyLevelUpdate(message.energyLevel).then(sendResponse);
+          return true;
+        case 'getSyncStatus':
+          this.syncService.getSyncStatus().then(sendResponse);
+          return true;
+        case 'resolveConflict':
+          this.syncService.resolveConflict(message.conflictId, message.resolution).then(sendResponse);
+          return true;
       }
       return true; // Keep message channel open for async response
     });
@@ -759,6 +794,47 @@ class ProactivityBackgroundService {
       'This is a test of the system-level notification system',
       'warning'
     );
+  }
+
+  // Sync-related handlers
+  async handleTasksUpdate(tasks) {
+    try {
+      // Update local storage
+      await chrome.storage.local.set({ tasks });
+      
+      // Queue for sync with Obsidian and backend
+      this.syncService.queueForSync({
+        type: 'task_update',
+        data: tasks,
+        timestamp: Date.now()
+      });
+      
+      // Re-check daily todo completion
+      await this.checkDailyTodoCompletion();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error handling tasks update:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async handleEnergyLevelUpdate(energyLevel) {
+    try {
+      // Update local storage
+      await chrome.storage.local.set({ currentEnergyLevel: energyLevel });
+      
+      // Queue for sync
+      this.syncService.queueForSync({
+        type: 'energy_update',
+        data: { level: energyLevel, timestamp: Date.now() }
+      });
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error handling energy level update:', error);
+      return { success: false, error: error.message };
+    }
   }
 }
 
