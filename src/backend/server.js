@@ -12,6 +12,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import obsidianRoutes from './routes/obsidianRoutes.js';
 import outOfOfficeRoutes from './routes/outOfOfficeRoutes.js';
 import docsRoutes from './routes/docsRoutes.js';
+import morningPlanningRoutes from './routes/morningPlanningRoutes.js';
 
 // Import middleware
 import authMiddleware from './middleware/auth.js';
@@ -23,6 +24,11 @@ import TaskBreakdownService from './services/taskBreakdownService.js';
 import ADHDPatternService from './services/adhdPatternService.js';
 import ProactiveNotificationService from './services/proactiveNotificationService.js';
 import OutOfOfficeService from './services/outOfOfficeService.js';
+import ProactivitySpectrumService from './services/proactiveSpectrumService.js';
+import MorningPlanningEnforcementService from './services/morningPlanningEnforcementService.js';
+
+// Import database
+import database from './database/database.js';
 
 // Initialize dotenv with path to root .env file
 const __filename = fileURLToPath(import.meta.url);
@@ -32,11 +38,17 @@ dotenv.config({ path: join(__dirname, '../../.env') });
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Initialize services
+// Initialize database first
+console.log('🗄️  Initializing database...');
+await database.initialize();
+
+// Initialize services with database access
 const outOfOfficeService = new OutOfOfficeService();
 const taskBreakdownService = new TaskBreakdownService(process.env.OPENAI_API_KEY);
 const patternService = new ADHDPatternService();
 const notificationService = new ProactiveNotificationService(patternService);
+const spectrumService = new ProactivitySpectrumService(notificationService, patternService, outOfOfficeService);
+const enforcementService = new MorningPlanningEnforcementService(database, spectrumService, notificationService);
 
 // Integrate out of office service with other services
 outOfOfficeService.registerHook('notifications', {
@@ -61,12 +73,15 @@ outOfOfficeService.registerHook('patterns', {
   }
 });
 
-// Make services available to routes
+// Make services and database available to routes
 app.locals.services = {
+  database: database,
   taskBreakdown: taskBreakdownService,
   patterns: patternService,
   notifications: notificationService,
-  outOfOffice: outOfOfficeService
+  outOfOffice: outOfOfficeService,
+  spectrum: spectrumService,
+  enforcement: enforcementService
 };
 
 // Middleware
@@ -92,7 +107,9 @@ app.get('/health', (req, res) => {
     services: {
       taskBreakdown: !!taskBreakdownService,
       patterns: !!patternService,
-      notifications: !!notificationService
+      notifications: !!notificationService,
+      spectrum: !!spectrumService,
+      enforcement: !!enforcementService
     }
   });
 });
@@ -105,6 +122,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/obsidian', obsidianRoutes);
 app.use('/api/out-of-office', outOfOfficeRoutes);
 app.use('/api/docs', docsRoutes);
+app.use('/api/morning-planning', morningPlanningRoutes);
 
 // Protected routes (require authentication)
 app.use('/api/protected/*', authMiddleware);

@@ -730,6 +730,104 @@ class ProactivitySpectrumService extends EventEmitter {
     const preferredLevel = this.getUserPreferredLevel();
     this.setSpectrumLevel(preferredLevel);
   }
+
+  /**
+   * Get current spectrum level for a user
+   */
+  async getCurrentSpectrumLevel(userId) {
+    // For now, return the current spectrum level
+    // In a full implementation, this would be stored per-user
+    return this.currentSpectrum.level;
+  }
+
+  /**
+   * Get when morning planning was started
+   */
+  async getMorningPlanningStartTime(userId) {
+    return this.morningTodoStatus.startTime || new Date().toISOString();
+  }
+
+  /**
+   * Reset morning planning level after completion
+   */
+  async resetMorningPlanningLevel(userId) {
+    const originalLevel = this.getUserPreferredLevel();
+    await this.setSpectrumLevel(originalLevel);
+    this.morningTodoStatus.completed = true;
+    this.morningTodoStatus.completionTime = new Date().toISOString();
+  }
+
+  /**
+   * Escalate spectrum level due to morning planning delays
+   */
+  async escalateSpectrumLevel(userId, reason, data) {
+    const currentLevel = this.currentSpectrum.level;
+    let newLevel = currentLevel;
+
+    // Escalation logic based on reason
+    switch (reason) {
+      case 'time_elapsed':
+        if (data >= 30 && currentLevel < 3) newLevel = 3;
+        break;
+      case 'prolonged_delay':
+        if (data >= 60 && currentLevel < 5) newLevel = 5;
+        break;
+      case 'serious_procrastination':
+        if (data >= 120 && currentLevel < 8) newLevel = 8;
+        break;
+      default:
+        newLevel = Math.min(currentLevel + 1, this.currentSpectrum.maxDailyEscalation);
+    }
+
+    if (newLevel > currentLevel) {
+      await this.setSpectrumLevel(newLevel);
+    }
+
+    return newLevel;
+  }
+
+  /**
+   * Grant emergency bypass with duration and reason
+   */
+  async grantEmergencyBypass(userId, durationMinutes, reason) {
+    const bypass = {
+      userId,
+      timestamp: new Date().toISOString(),
+      reason,
+      durationMinutes,
+      originalLevel: this.currentSpectrum.level,
+      temporaryLevel: Math.max(1, this.currentSpectrum.level - 3)
+    };
+
+    // Temporarily reduce spectrum level
+    await this.setSpectrumLevel(bypass.temporaryLevel);
+
+    // Schedule return to original level
+    setTimeout(async () => {
+      await this.setSpectrumLevel(bypass.originalLevel);
+    }, durationMinutes * 60 * 1000);
+
+    this.emit('emergencyBypass', bypass);
+    return bypass;
+  }
+
+  /**
+   * Start morning planning enforcement
+   */
+  async startMorningPlanningEnforcement(userId) {
+    this.morningTodoStatus = {
+      completed: false,
+      startTime: new Date().toISOString(),
+      escalationLevel: 1,
+      attempts: 0,
+      lastEscalation: null
+    };
+
+    // Start with gentle reminder
+    await this.setSpectrumLevel(Math.max(this.currentSpectrum.level, 2));
+
+    return this.morningTodoStatus;
+  }
 }
 
 export default ProactivitySpectrumService;
