@@ -1,0 +1,13 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#667eea" stroke="#4c63d2" stroke-width="4"/>
+
+  <!-- Brain icon -->
+  <path d="M44 50c-8 0-14 6-14 14s6 14 14 14h4v8c0 8 6 14 14 14h8c8 0 14-6 14-14v-8h4c8 0 14-6 14-14s-6-14-14-14h-4v-8c0-8-6-14-14-14h-8c-8 0-14 6-14 14v8h-4z" fill="white" opacity="0.9"/>
+
+  <!-- Checkmark -->
+  <path d="M52 70l8 8 16-16" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Text -->
+  <text x="64" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#4c63d2">FOCUS</text>
+</svg>
