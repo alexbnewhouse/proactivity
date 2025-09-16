@@ -1,10 +1,12 @@
 import { App, Modal, Setting, Notice, TFile } from 'obsidian';
 import { ProactivitySettings } from './main';
 import { ObsidianIntegrationService } from './obsidian-integration-service';
+import { ProactivityApiClient, TaskBreakdownRequest } from './api-client';
 
 export class TaskBreakdownModal extends Modal {
   private settings: ProactivitySettings;
   private integrationService: ObsidianIntegrationService;
+  private apiClient: ProactivityApiClient;
   private sourceFile: TFile | null;
   private selectedText: string = '';
   private taskInput: HTMLInputElement;
@@ -24,6 +26,7 @@ export class TaskBreakdownModal extends Modal {
     super(app);
     this.settings = settings;
     this.integrationService = integrationService;
+    this.apiClient = new ProactivityApiClient(settings);
     this.sourceFile = sourceFile || null;
   }
 
@@ -354,35 +357,112 @@ export class TaskBreakdownModal extends Modal {
   }
 
   private async requestTaskBreakdown(params: any) {
-    // In a real implementation, this would call the backend API
-    // For now, return a mock breakdown
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+    const request: TaskBreakdownRequest = {
+      task: params.task,
+      context: {
+        currentEnergyLevel: params.energyLevel,
+        availableTime: params.availableTime,
+        preferredComplexity: this.getComplexityFromDepth(params.depth),
+        executiveFunctionChallenges: [],
+        currentProject: 'dissertation',
+        sourceFile: params.sourceFile,
+        selectedText: params.selectedText,
+        depth: params.depth
+      }
+    };
+
+    try {
+      // First test connection
+      const isConnected = await this.apiClient.testConnection();
+      if (!isConnected) {
+        throw new Error('Unable to connect to Proactivity backend. Using fallback breakdown.');
+      }
+
+      const response = await this.apiClient.breakdownTask(request);
+      return ProactivityApiClient.formatBreakdownForUI(response);
+      
+    } catch (error) {
+      console.warn('API breakdown failed, using fallback:', error);
+      
+      // Show notice about fallback mode
+      new Notice('Using local breakdown (backend unavailable)', 4000);
+      
+      // Return fallback breakdown
+      return this.getFallbackBreakdown(params);
+    }
+  }
+
+  private getComplexityFromDepth(depth: number): string {
+    const complexityMap = {
+      1: 'micro',
+      2: 'simple', 
+      3: 'moderate',
+      4: 'moderate',
+      5: 'complex'
+    };
+    return complexityMap[depth as keyof typeof complexityMap] || 'moderate';
+  }
+
+  private getFallbackBreakdown(params: any) {
+    const stepCount = Math.max(2, Math.min(8, params.depth + 1));
+    const timePerStep = Math.floor(params.availableTime / stepCount);
+    
+    const fallbackSteps = [
+      {
+        id: `fallback_${Date.now()}_1`,
+        title: 'Clarify the goal',
+        description: `Define exactly what you want to accomplish with: "${params.task}"`,
+        estimatedMinutes: Math.min(10, timePerStep),
+        complexity: 'micro',
+        tips: ['Write down the specific outcome you want', 'Break it into concrete terms']
+      },
+      {
+        id: `fallback_${Date.now()}_2`,
+        title: 'Gather materials',
+        description: 'Collect all documents, tools, or resources you\'ll need',
+        estimatedMinutes: Math.min(15, timePerStep),
+        complexity: 'simple',  
+        tips: ['Have everything within reach', 'Close distracting tabs/apps']
+      },
+      {
+        id: `fallback_${Date.now()}_3`,
+        title: 'Start with the easiest part',
+        description: 'Begin with the most straightforward aspect of this task',
+        estimatedMinutes: timePerStep,
+        complexity: 'simple',
+        tips: ['Momentum builds with action', 'Perfect is the enemy of done']
+      }
+    ];
+
+    // Add more steps based on depth
+    if (stepCount > 3) {
+      fallbackSteps.push({
+        id: `fallback_${Date.now()}_4`,
+        title: 'Make steady progress',
+        description: 'Continue working on the main content of your task',
+        estimatedMinutes: timePerStep,
+        complexity: 'moderate',
+        tips: ['Take breaks if you need them', 'Celebrate small wins']
+      });
+    }
+
+    if (stepCount > 4) {
+      fallbackSteps.push({
+        id: `fallback_${Date.now()}_5`,
+        title: 'Review and refine',
+        description: 'Look over what you\'ve accomplished and make improvements',
+        estimatedMinutes: Math.min(20, timePerStep),
+        complexity: 'simple',
+        tips: ['Focus on progress over perfection', 'You\'ve done great work!']
+      });
+    }
 
     return {
-      motivation: "Great choice! Breaking this down will make it much more manageable. 🎯",
-      steps: [
-        {
-          title: "Set up your workspace",
-          description: "Clear your desk and open necessary files",
-          estimatedMinutes: 5,
-          complexity: "micro",
-          tips: ["Put away distractions", "Have water nearby"]
-        },
-        {
-          title: "Create a rough outline",
-          description: "Jot down 3-5 main points you want to cover",
-          estimatedMinutes: 10,
-          complexity: "simple",
-          tips: ["Don't worry about perfection", "Use bullet points"]
-        },
-        {
-          title: "Write the first paragraph",
-          description: "Focus on just the opening paragraph",
-          estimatedMinutes: 15,
-          complexity: "moderate",
-          tips: ["Start with any sentence", "You can edit later"]
-        }
-      ]
+      motivation: `I've created a ${stepCount}-step breakdown to help you tackle this task. You've got this! 🎯`,
+      steps: fallbackSteps.slice(0, stepCount),
+      totalEstimatedTime: fallbackSteps.slice(0, stepCount).reduce((sum, step) => sum + step.estimatedMinutes, 0),
+      strategy: 'fallback-breakdown',
+      optimizations: ['momentum-building', 'adhd-friendly-steps']
     };
   }
 

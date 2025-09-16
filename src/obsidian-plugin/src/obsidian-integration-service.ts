@@ -1,5 +1,6 @@
 import { App, TFile, Notice, MetadataCache, MarkdownView, TFolder } from 'obsidian';
 import { ProactivitySettings } from './main';
+import { ProactivityApiClient } from './api-client';
 
 /**
  * Service for deep integration with Obsidian's features
@@ -8,17 +9,20 @@ import { ProactivitySettings } from './main';
 export class ObsidianIntegrationService {
   private app: App;
   private settings: ProactivitySettings;
+  private apiClient: ProactivityApiClient;
   private dailyNotificationCount: number = 0;
   private lastNotificationReset: string = '';
 
   constructor(app: App, settings: ProactivitySettings) {
     this.app = app;
     this.settings = settings;
+    this.apiClient = new ProactivityApiClient(settings);
     this.resetDailyCountIfNeeded();
   }
 
   updateSettings(settings: ProactivitySettings) {
     this.settings = settings;
+    this.apiClient.updateSettings(settings);
   }
 
   /**
@@ -91,21 +95,29 @@ Tags: ${this.settings.obsidianIntegration.taskTagPrefix}/quick-note
    * Update user's current energy level
    */
   async updateEnergyLevel(energyLevel: string) {
+    // Update locally first
     const dailyNotePath = await this.getDailyNotePath();
-    if (!dailyNotePath) return;
+    if (dailyNotePath) {
+      try {
+        const file = await this.getOrCreateFile(dailyNotePath);
+        const content = await this.app.vault.read(file);
 
-    try {
-      const file = await this.getOrCreateFile(dailyNotePath);
-      const content = await this.app.vault.read(file);
+        // Update or add energy level section
+        const energySection = `\n## Energy Tracking\n\n- ${new Date().toLocaleTimeString()}: ${energyLevel}\n`;
+        const updatedContent = this.updateDailyNoteSection(content, 'Energy Tracking', energySection);
 
-      // Update or add energy level section
-      const energySection = `\n## Energy Tracking\n\n- ${new Date().toLocaleTimeString()}: ${energyLevel}\n`;
-      const updatedContent = this.updateDailyNoteSection(content, 'Energy Tracking', energySection);
-
-      await this.app.vault.modify(file, updatedContent);
-    } catch (error) {
-      console.error('Error updating energy level:', error);
+        await this.app.vault.modify(file, updatedContent);
+      } catch (error) {
+        console.error('Error updating energy level locally:', error);
+      }
     }
+
+    // Sync with backend
+    await this.apiClient.safeApiCall(
+      () => this.apiClient.updateEnergyLevel(energyLevel),
+      undefined,
+      'Failed to sync energy level with backend'
+    );
   }
 
   /**
@@ -132,22 +144,39 @@ Tags: ${this.settings.obsidianIntegration.taskTagPrefix}/quick-note
    * Start tracking a task
    */
   async startTask(task: any) {
+    // Update daily note locally
     const dailyNotePath = await this.getDailyNotePath();
-    if (!dailyNotePath) return;
+    if (dailyNotePath) {
+      try {
+        const file = await this.getOrCreateFile(dailyNotePath);
+        const content = await this.app.vault.read(file);
 
-    try {
-      const file = await this.getOrCreateFile(dailyNotePath);
-      const content = await this.app.vault.read(file);
+        const taskEntry = `- [ ] ${task.title} (${task.estimatedMinutes}min) - Started: ${new Date().toLocaleTimeString()}\n`;
+        const updatedContent = this.updateDailyNoteSection(content, 'Tasks', `\n## Tasks\n\n${taskEntry}`);
 
-      const taskEntry = `- [ ] ${task.title} (${task.estimatedMinutes}min) - Started: ${new Date().toLocaleTimeString()}\n`;
-      const updatedContent = this.updateDailyNoteSection(content, 'Tasks', `\n## Tasks\n\n${taskEntry}`);
-
-      await this.app.vault.modify(file, updatedContent);
-
-      new Notice(`Started: ${task.title}`);
-    } catch (error) {
-      console.error('Error starting task:', error);
+        await this.app.vault.modify(file, updatedContent);
+        new Notice(`Started: ${task.title}`);
+      } catch (error) {
+        console.error('Error starting task locally:', error);
+      }
     }
+
+    // Start tracking with backend
+    await this.apiClient.safeApiCall(
+      () => this.apiClient.startTask(task.id || `task_${Date.now()}`, task.estimatedMinutes),
+      undefined,
+      'Failed to sync task start with backend'
+    );
+
+    // Record activity for pattern detection
+    await this.apiClient.safeApiCall(
+      () => this.apiClient.recordActivity('task_start', {
+        taskId: task.id,
+        title: task.title,
+        estimatedMinutes: task.estimatedMinutes,
+        complexity: task.complexity
+      })
+    );
   }
 
   /**
@@ -155,6 +184,23 @@ Tags: ${this.settings.obsidianIntegration.taskTagPrefix}/quick-note
    */
   async getTaskSuggestions(energyLevel: string): Promise<any[]> {
     const context = await this.getCurrentContext();
+    
+    // Try to get suggestions from backend first
+    const backendSuggestions = await this.apiClient.safeApiCall(
+      () => this.apiClient.getTaskSuggestions(energyLevel, 30),
+      null,
+      'Using local task suggestions'
+    );
+
+    if (backendSuggestions?.success) {
+      return backendSuggestions.data;
+    }
+
+    // Fallback to local suggestions
+    return this.getLocalTaskSuggestions(energyLevel, context);
+  }
+
+  private async getLocalTaskSuggestions(energyLevel: string, context: any): Promise<any[]> {
     const dissertationFiles = await this.getDissertationFiles();
     const unfinishedTasks = await this.getUnfinishedTasks();
 
@@ -256,7 +302,11 @@ Tags: ${this.settings.obsidianIntegration.taskTagPrefix}/quick-note
     // Add unfinished tasks
     suggestions.push(...unfinishedTasks.slice(0, 2));
 
-    return suggestions.slice(0, 5); // Limit to 5 suggestions to avoid overwhelm
+    return suggestions.slice(0, 5).map((task, index) => ({
+      ...task,
+      id: task.id || `suggestion_${Date.now()}_${index}`,
+      adhdOptimized: true
+    }));
   }
 
   /**

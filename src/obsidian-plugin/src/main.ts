@@ -34,7 +34,7 @@ export interface ProactivitySettings {
 
 const DEFAULT_SETTINGS: ProactivitySettings = {
   apiKey: '',
-  serverUrl: 'http://localhost:3001',
+  serverUrl: 'http://localhost:3002',
   enableProactiveNotifications: true,
   maxDailyNotifications: 12,
   defaultBreakdownDepth: 3,
@@ -73,6 +73,9 @@ export default class ProactivityPlugin extends Plugin {
     this.integrationService = new ObsidianIntegrationService(this.app, this.settings);
     this.patternDetector = new ADHDPatternDetector(this.app, this.settings);
 
+    // Test backend connection
+    await this.testBackendConnection();
+
     // Register view for main interface
     this.registerView(
       VIEW_TYPE_PROACTIVITY,
@@ -105,6 +108,23 @@ export default class ProactivityPlugin extends Plugin {
     this.addSettingTab(new ProactivitySettingTab(this.app, this));
 
     new Notice('Proactivity: Your ADHD-friendly dissertation assistant is ready!');
+  }
+
+  private async testBackendConnection() {
+    try {
+      const response = await fetch(`${this.settings.serverUrl}/health`);
+      if (response.ok) {
+        const health = await response.json();
+        new Notice(`✅ Connected to Proactivity backend (v${health.version || '1.0.0'})`, 3000);
+        this.updateStatusBar('Connected');
+      } else {
+        throw new Error('Backend health check failed');
+      }
+    } catch (error) {
+      console.warn('Backend connection failed:', error);
+      new Notice('⚠️ Backend offline - using local mode. Task breakdown will use fallback.', 6000);
+      this.updateStatusBar('Offline mode');
+    }
   }
 
   onunload() {

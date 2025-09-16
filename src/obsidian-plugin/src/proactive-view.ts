@@ -1,12 +1,14 @@
 import { ItemView, WorkspaceLeaf, Setting, Modal, App, Notice } from 'obsidian';
 import { ProactivitySettings } from './main';
 import { ObsidianIntegrationService } from './obsidian-integration-service';
+import { ProactivityApiClient } from './api-client';
 
 export const VIEW_TYPE_PROACTIVITY = 'proactivity-view';
 
 export class ProactivityView extends ItemView {
   private settings: ProactivitySettings;
   private integrationService: ObsidianIntegrationService;
+  private apiClient: ProactivityApiClient;
   private currentEnergyLevel: string = 'moderate';
   private todaysTasks: any[] = [];
   private currentFocus: string = '';
@@ -19,6 +21,7 @@ export class ProactivityView extends ItemView {
     super(leaf);
     this.settings = settings;
     this.integrationService = integrationService;
+    this.apiClient = new ProactivityApiClient(settings);
   }
 
   getViewType() {
