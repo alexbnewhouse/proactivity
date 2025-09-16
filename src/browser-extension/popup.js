@@ -63,6 +63,15 @@ class ProactivityPopup {
       this.startBreak();
     });
 
+    // Task actions
+    document.getElementById('add-quick-task').addEventListener('click', () => {
+      this.addQuickTask();
+    });
+
+    document.getElementById('view-all-tasks').addEventListener('click', () => {
+      this.openUnifiedDashboard();
+    });
+
     // Task input
     document.getElementById('task-input').addEventListener('input', (e) => {
       this.currentTask = e.target.value;
@@ -95,7 +104,25 @@ class ProactivityPopup {
     });
   }
 
-  updateUI() {
+  async updateUI() {
+    // Get session data from background script
+    try {
+      const sessionData = await chrome.runtime.sendMessage({ action: 'getSessionData' });
+      if (sessionData) {
+        this.currentSession = sessionData.session;
+        
+        // Update enforcement status
+        const enforcementStatus = document.getElementById('enforcement-status');
+        if (sessionData.enforcementActive && !sessionData.hasCompletedDailyTodo) {
+          enforcementStatus.style.display = 'block';
+        } else {
+          enforcementStatus.style.display = 'none';
+        }
+      }
+    } catch (error) {
+      console.log('Could not get session data:', error);
+    }
+
     // Update session stats
     document.getElementById('focus-time').textContent = this.formatTime(this.currentSession.focusTime);
     document.getElementById('tab-switches').textContent = this.currentSession.tabSwitches || 0;
@@ -113,6 +140,9 @@ class ProactivityPopup {
     document.getElementById('enable-procrastination-alerts').checked = this.settings.enableProcrastinationAlerts;
     document.getElementById('enable-hyperfocus-protection').checked = this.settings.enableHyperfocusProtection;
     document.getElementById('enable-tab-switching-alerts').checked = this.settings.enableTabSwitchingAlerts;
+
+    // Load and display urgent tasks
+    await this.loadUrgentTasks();
   }
 
   async setEnergyLevel(level) {
@@ -295,6 +325,128 @@ class ProactivityPopup {
     } catch (error) {
       console.log('Backend sync error (this is ok for offline use):', error);
     }
+  }
+
+  async loadUrgentTasks() {
+    try {
+      const urgentTasks = await chrome.runtime.sendMessage({ action: 'getUrgentTasks' });
+      this.displayUrgentTasks(urgentTasks || []);
+    } catch (error) {
+      console.error('Error loading urgent tasks:', error);
+      this.displayUrgentTasks([]);
+    }
+  }
+
+  displayUrgentTasks(tasks) {
+    const urgentTasksList = document.getElementById('urgent-tasks-list');
+    
+    if (tasks.length === 0) {
+      urgentTasksList.innerHTML = `
+        <div class="no-urgent-tasks">
+          <div class="no-urgent-tasks-icon">✅</div>
+          <div>No urgent tasks - great job!</div>
+        </div>
+      `;
+      return;
+    }
+
+    urgentTasksList.innerHTML = tasks.map(task => `
+      <div class="urgent-task-item" data-task-id="${task.id}">
+        <div class="urgent-task-checkbox ${task.completed ? 'completed' : ''}" 
+             data-task-id="${task.id}"></div>
+        <div class="urgent-task-content">
+          <div class="urgent-task-title">${this.escapeHtml(task.title)}</div>
+          <div class="urgent-task-meta">
+            <span class="urgent-task-priority ${task.priority}">${task.priority}</span>
+            <span>Score: ${Math.round(task.urgencyScore)}</span>
+            ${task.estimatedMinutes ? `<span>${task.estimatedMinutes}m</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    // Add event listeners for task completion
+    urgentTasksList.querySelectorAll('.urgent-task-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleTask(e.target.dataset.taskId);
+      });
+    });
+
+    // Add event listeners for task items (open in dashboard)
+    urgentTasksList.querySelectorAll('.urgent-task-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('urgent-task-checkbox')) {
+          this.openUnifiedDashboard();
+        }
+      });
+    });
+  }
+
+  async toggleTask(taskId) {
+    try {
+      // Get current tasks
+      const data = await chrome.storage.local.get(['tasks']);
+      const tasks = data.tasks || [];
+      
+      // Find and toggle the task
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        task.completed = !task.completed;
+        task.completedAt = task.completed ? new Date().toISOString() : null;
+        
+        // Save tasks
+        await chrome.storage.local.set({ tasks });
+        
+        // Notify background script
+        chrome.runtime.sendMessage({
+          action: 'taskCompleted',
+          task: task
+        });
+        
+        // Refresh UI
+        await this.loadUrgentTasks();
+        await this.updateUI();
+      }
+    } catch (error) {
+      console.error('Error toggling task:', error);
+    }
+  }
+
+  async addQuickTask() {
+    const taskTitle = prompt('What task would you like to add?');
+    if (taskTitle && taskTitle.trim()) {
+      try {
+        const data = await chrome.storage.local.get(['tasks']);
+        const tasks = data.tasks || [];
+        
+        const newTask = {
+          id: Date.now().toString(),
+          title: taskTitle.trim(),
+          priority: 'medium',
+          completed: false,
+          createdAt: new Date().toISOString(),
+          energyLevel: 3,
+          estimatedMinutes: 30
+        };
+        
+        tasks.unshift(newTask);
+        await chrome.storage.local.set({ tasks });
+        
+        // Refresh urgent tasks
+        await this.loadUrgentTasks();
+        
+      } catch (error) {
+        console.error('Error adding task:', error);
+        alert('Error adding task. Please try again.');
+      }
+    }
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }
 

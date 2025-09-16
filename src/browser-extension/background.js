@@ -24,9 +24,75 @@ class ProactivityBackgroundService {
       hyperfocusCheck: 90 * 60 * 1000 // 90 minutes
     };
 
+    // Enforcement state
+    this.enforcementActive = false;
+    this.allowedDomains = ['chrome://settings', 'chrome://extensions', 'localhost'];
+    this.hasCompletedDailyTodo = false;
+
     this.setupEventListeners();
     this.startMonitoring();
     this.setupMessageHandlers();
+    this.initializeEnforcement();
+  }
+
+  async initializeEnforcement() {
+    // Check if user has completed any task today
+    await this.checkDailyTodoCompletion();
+    
+    // Set up enforcement based on completion status
+    if (!this.hasCompletedDailyTodo) {
+      this.enableStrictEnforcement();
+    }
+  }
+
+  async checkDailyTodoCompletion() {
+    try {
+      const data = await chrome.storage.local.get(['tasks', 'dailyStats']);
+      const today = new Date().toDateString();
+      
+      // Check if any task was completed today
+      const tasks = data.tasks || [];
+      const completedToday = tasks.some(task => {
+        if (!task.completed || !task.completedAt) return false;
+        const completedDate = new Date(task.completedAt).toDateString();
+        return completedDate === today;
+      });
+      
+      // Also check daily stats
+      const dailyStats = data.dailyStats || {};
+      const todayStats = dailyStats[today];
+      const statsShowCompletion = todayStats && todayStats.completed > 0;
+      
+      this.hasCompletedDailyTodo = completedToday || statsShowCompletion;
+      console.log('Daily todo completion status:', this.hasCompletedDailyTodo);
+    } catch (error) {
+      console.error('Error checking daily todo completion:', error);
+      this.hasCompletedDailyTodo = false;
+    }
+  }
+
+  enableStrictEnforcement() {
+    this.enforcementActive = true;
+    console.log('Strict enforcement ENABLED - blocking all websites until daily todo completion');
+    
+    // Show system notification
+    this.showSystemNotification(
+      'Proactivity Enforcement Active',
+      'Complete at least one task today to unlock web browsing',
+      'blocking'
+    );
+  }
+
+  disableStrictEnforcement() {
+    this.enforcementActive = false;
+    console.log('Strict enforcement DISABLED - daily todo completed');
+    
+    // Show system notification
+    this.showSystemNotification(
+      'Great Job! 🎉',
+      'Daily task completed - web browsing unlocked!',
+      'success'
+    );
   }
 
   setupMessageHandlers() {
@@ -42,12 +108,23 @@ class ProactivityBackgroundService {
         case 'startFocusSession':
           this.startFocusSession(message.task);
           break;
+        case 'taskCompleted':
+          this.handleTaskCompletion(message.task);
+          break;
         case 'getSessionData':
           sendResponse({
             session: this.currentSession,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            enforcementActive: this.enforcementActive,
+            hasCompletedDailyTodo: this.hasCompletedDailyTodo
           });
           break;
+        case 'testFocusMode':
+          this.testEnforcementMechanism();
+          break;
+        case 'getUrgentTasks':
+          this.getUrgentTasks().then(sendResponse);
+          return true; // Keep channel open for async response
       }
       return true; // Keep message channel open for async response
     });
@@ -120,8 +197,59 @@ class ProactivityBackgroundService {
   async handleTabUpdate(tabId, url) {
     const tab = await chrome.tabs.get(tabId);
 
+    // Check if website should be blocked
+    if (this.enforcementActive && this.shouldBlockUrl(url)) {
+      await this.blockWebsite(tabId, url);
+      return;
+    }
+
     if (tab.active) {
       await this.analyzeTabForProcrastination(tab);
+    }
+  }
+
+  shouldBlockUrl(url) {
+    if (!url) return false;
+    
+    const domain = this.extractDomain(url);
+    
+    // Allow chrome:// URLs and extension pages
+    if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('moz-extension://')) {
+      return false;
+    }
+    
+    // Allow local development
+    if (this.allowedDomains.some(allowed => domain.includes(allowed))) {
+      return false;
+    }
+    
+    // Block everything else when enforcement is active
+    return true;
+  }
+
+  async blockWebsite(tabId, url) {
+    const blockPageUrl = chrome.runtime.getURL('blocked.html') + '?url=' + encodeURIComponent(url);
+    
+    try {
+      await chrome.tabs.update(tabId, { url: blockPageUrl });
+      
+      // Show system notification
+      this.showSystemNotification(
+        'Website Blocked',
+        'Complete a daily task to unlock web browsing',
+        'warning'
+      );
+    } catch (error) {
+      console.error('Error blocking website:', error);
+    }
+  }
+
+  async handleTaskCompletion(task) {
+    // Re-check daily completion status
+    await this.checkDailyTodoCompletion();
+    
+    if (this.hasCompletedDailyTodo && this.enforcementActive) {
+      this.disableStrictEnforcement();
     }
   }
 
@@ -520,6 +648,111 @@ class ProactivityBackgroundService {
     } catch (error) {
       console.log('Backend sync failed (this is ok for offline use):', error);
     }
+  }
+
+  // System-level notifications
+  async showSystemNotification(title, message, type = 'info') {
+    const options = {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon48.png'),
+      title: title,
+      message: message,
+      priority: type === 'warning' || type === 'blocking' ? 2 : 1,
+      requireInteraction: type === 'blocking'
+    };
+
+    // Add action buttons for certain types
+    if (type === 'blocking') {
+      options.buttons = [
+        { title: 'View Tasks' },
+        { title: 'Settings' }
+      ];
+    }
+
+    try {
+      const notificationId = `proactivity-${type}-${Date.now()}`;
+      await chrome.notifications.create(notificationId, options);
+      
+      // Handle button clicks
+      if (options.buttons) {
+        chrome.notifications.onButtonClicked.addListener((notifId, buttonIndex) => {
+          if (notifId === notificationId) {
+            if (buttonIndex === 0) {
+              // View Tasks
+              chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+            } else if (buttonIndex === 1) {
+              // Settings
+              chrome.runtime.openOptionsPage();
+            }
+          }
+        });
+      }
+
+      // Auto-clear notification after delay
+      if (type !== 'blocking') {
+        setTimeout(() => {
+          chrome.notifications.clear(notificationId);
+        }, 8000);
+      }
+
+    } catch (error) {
+      console.error('Error showing system notification:', error);
+    }
+  }
+
+  // Get urgent tasks for popup display
+  async getUrgentTasks() {
+    try {
+      const data = await chrome.storage.local.get(['tasks']);
+      const tasks = data.tasks || [];
+      
+      // Filter and sort tasks by urgency
+      const urgentTasks = tasks
+        .filter(task => !task.completed)
+        .map(task => ({
+          ...task,
+          urgencyScore: this.calculateUrgencyScore(task)
+        }))
+        .sort((a, b) => b.urgencyScore - a.urgencyScore)
+        .slice(0, 5);
+
+      return urgentTasks;
+    } catch (error) {
+      console.error('Error getting urgent tasks:', error);
+      return [];
+    }
+  }
+
+  calculateUrgencyScore(task) {
+    let score = 0;
+    
+    // Priority weight
+    const priorityWeights = { high: 50, medium: 30, low: 10 };
+    score += priorityWeights[task.priority] || 20;
+    
+    // Age weight (older tasks get higher score)
+    const daysSinceCreated = (Date.now() - new Date(task.createdAt)) / (1000 * 60 * 60 * 24);
+    score += Math.min(daysSinceCreated * 5, 30); // Max 30 points for age
+    
+    // Energy level match (tasks matching current energy get bonus)
+    if (task.energyLevel === this.currentEnergyLevel) {
+      score += 15;
+    }
+    
+    // Estimated time bonus (shorter tasks get slight preference)
+    if (task.estimatedMinutes && task.estimatedMinutes <= 30) {
+      score += 10;
+    }
+    
+    return score;
+  }
+
+  testEnforcementMechanism() {
+    this.showSystemNotification(
+      'Enforcement Test',
+      'This is a test of the system-level notification system',
+      'warning'
+    );
   }
 }
 

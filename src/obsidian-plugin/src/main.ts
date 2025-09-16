@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, ItemView, Modal, MarkdownView } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, WorkspaceLeaf, ItemView, Modal, MarkdownView, TFile } from 'obsidian';
 import { ProactivityView, VIEW_TYPE_PROACTIVITY } from './proactive-view';
 import { TaskBreakdownModal } from './task-breakdown-modal';
 import { ADHDPatternDetector } from './adhd-pattern-detector';
@@ -15,6 +15,25 @@ export interface ProactivitySettings {
   enableHyperfocusProtection: boolean;
   procrastinationThreshold: number; // minutes
   energyCheckInterval: number; // minutes
+  // Browser extension sync settings
+  browserExtensionSync: {
+    enableSync: boolean;
+    syncInterval: number; // minutes
+    lastSyncTimestamp: number;
+    syncTasks: boolean;
+    syncEnergyLevels: boolean;
+    syncFocusSessions: boolean;
+    syncEnforcementSettings: boolean;
+  };
+  // Enhanced enforcement settings
+  enforcement: {
+    enableStrictMode: boolean;
+    blockAllWebsites: boolean;
+    requireDailyTaskCompletion: boolean;
+    allowedDomains: string[];
+    enforcementStartTime: string; // "09:00"
+    enforcementEndTime: string; // "17:00"
+  };
   obsidianIntegration: {
     enableTaskSync: boolean;
     enableProgressTracking: boolean;
@@ -42,6 +61,23 @@ const DEFAULT_SETTINGS: ProactivitySettings = {
   enableHyperfocusProtection: true,
   procrastinationThreshold: 30,
   energyCheckInterval: 120,
+  browserExtensionSync: {
+    enableSync: true,
+    syncInterval: 5, // minutes
+    lastSyncTimestamp: 0,
+    syncTasks: true,
+    syncEnergyLevels: true,
+    syncFocusSessions: true,
+    syncEnforcementSettings: true,
+  },
+  enforcement: {
+    enableStrictMode: false,
+    blockAllWebsites: false,
+    requireDailyTaskCompletion: false,
+    allowedDomains: ['localhost', 'obsidian.md', 'github.com'],
+    enforcementStartTime: '09:00',
+    enforcementEndTime: '17:00',
+  },
   obsidianIntegration: {
     enableTaskSync: true,
     enableProgressTracking: true,
@@ -65,6 +101,7 @@ export default class ProactivityPlugin extends Plugin {
   integrationService: ObsidianIntegrationService;
   private statusBarItem: HTMLElement;
   private notificationInterval: NodeJS.Timeout;
+  syncInterval: NodeJS.Timeout;
 
   async onload() {
     await this.loadSettings();
@@ -104,6 +141,11 @@ export default class ProactivityPlugin extends Plugin {
       this.startProactiveNotifications();
     }
 
+    // Start browser extension sync if enabled
+    if (this.settings.browserExtensionSync.enableSync) {
+      this.startBrowserExtensionSync();
+    }
+
     // Add settings tab
     this.addSettingTab(new ProactivitySettingTab(this.app, this));
 
@@ -114,7 +156,9 @@ export default class ProactivityPlugin extends Plugin {
     (window as any).Proactivity = {
       ctx: () => this.integrationService.getCurrentContext(),
       suggestions: (lvl: string) => this.integrationService.getTaskSuggestions(lvl || 'moderate'),
-      celebrate: () => this.celebrateProgress()
+      celebrate: () => this.celebrateProgress(),
+      sync: () => this.syncWithBrowserExtension(),
+      getUrgentTasks: () => this.getUrgentTasks()
     };
   }
 
@@ -135,10 +179,170 @@ export default class ProactivityPlugin extends Plugin {
     }
   }
 
+  // Browser Extension Sync Methods
+  startBrowserExtensionSync() {
+    console.log('Starting browser extension sync...');
+    
+    // Initial sync
+    this.syncWithBrowserExtension();
+    
+    // Set up periodic sync
+    const syncIntervalMs = this.settings.browserExtensionSync.syncInterval * 60 * 1000;
+    this.syncInterval = setInterval(() => {
+      this.syncWithBrowserExtension();
+    }, syncIntervalMs);
+  }
+
+  private async syncWithBrowserExtension() {
+    if (!this.settings.browserExtensionSync.enableSync) {
+      return;
+    }
+
+    try {
+      // Try to communicate with browser extension via local storage or API
+      const syncData = {
+        timestamp: Date.now(),
+        tasks: await this.getObsidianTasks(),
+        energyLevel: await this.getCurrentEnergyLevel(),
+        focusSessions: await this.getFocusSessions(),
+        enforcementSettings: this.settings.enforcement
+      };
+
+      // Store sync data for browser extension to read
+      localStorage.setItem('proactivity-obsidian-sync', JSON.stringify(syncData));
+      
+      // Also try direct browser extension communication if available
+      try {
+        // Check if browser extension API is available (Chromium browsers only)
+        // @ts-ignore - Chrome API not available in Obsidian context but checking anyway
+        if (typeof window !== 'undefined' && (window as any).chrome && (window as any).chrome.runtime) {
+          (window as any).chrome.runtime.sendMessage('your-extension-id', {
+            action: 'syncFromObsidian',
+            data: syncData
+          });
+        }
+      } catch (extError) {
+        // Browser extension communication not available, continue with localStorage
+      }
+
+      this.settings.browserExtensionSync.lastSyncTimestamp = Date.now();
+      await this.saveSettings();
+
+      console.log('Browser extension sync completed successfully');
+      
+    } catch (error) {
+      console.error('Browser extension sync failed:', error);
+    }
+  }
+
+  private async getObsidianTasks() {
+    // Extract tasks from Obsidian notes
+    const files = this.app.vault.getMarkdownFiles();
+    const tasks = [];
+
+    for (const file of files) {
+      const content = await this.app.vault.read(file);
+      const taskRegex = /- \[[ x]\] (.+?)(?:\n|$)/g;
+      let match;
+
+      while ((match = taskRegex.exec(content)) !== null) {
+        const isCompleted = match[0].includes('[x]');
+        const taskText = match[1].trim();
+
+        // Extract priority if present
+        const priorityMatch = taskText.match(/\!{1,3}/);
+        let priority = 'medium';
+        if (priorityMatch) {
+          priority = priorityMatch[0].length === 3 ? 'high' : priorityMatch[0].length === 2 ? 'medium' : 'low';
+        }
+
+        tasks.push({
+          id: `obsidian-${file.path}-${match.index}`,
+          title: taskText.replace(/\!{1,3}\s*/, ''), // Remove priority markers
+          completed: isCompleted,
+          priority: priority,
+          source: 'obsidian',
+          filePath: file.path,
+          createdAt: new Date(file.stat.ctime).toISOString(),
+          modifiedAt: new Date(file.stat.mtime).toISOString()
+        });
+      }
+    }
+
+    return tasks;
+  }
+
+  private async getCurrentEnergyLevel() {
+    // Try to determine energy level from recent notes or use default
+    const today = new Date().toISOString().split('T')[0];
+    const dailyNotePath = `${this.settings.obsidianIntegration.dailyNotePath}/${today}.md`;
+    
+    try {
+      const dailyNote = this.app.vault.getAbstractFileByPath(dailyNotePath);
+      if (dailyNote instanceof TFile) {
+        const content = await this.app.vault.read(dailyNote);
+        const energyMatch = content.match(/energy:\s*(\d+)/i);
+        if (energyMatch) {
+          return parseInt(energyMatch[1]);
+        }
+      }
+    } catch (error) {
+      // Daily note not found or couldn't parse energy level
+    }
+
+    return 3; // Default medium energy
+  }
+
+  private async getFocusSessions() {
+    // Return recent focus session data
+    // This would integrate with time tracking in Obsidian notes
+    return [];
+  }
+
+  private async getUrgentTasks() {
+    const tasks = await this.getObsidianTasks();
+    
+    // Calculate urgency scores similar to browser extension
+    return tasks
+      .filter(task => !task.completed)
+      .map(task => ({
+        ...task,
+        urgencyScore: this.calculateUrgencyScore(task)
+      }))
+      .sort((a, b) => b.urgencyScore - a.urgencyScore)
+      .slice(0, 5);
+  }
+
+  private calculateUrgencyScore(task: any) {
+    let score = 0;
+    
+    // Priority weight
+    const priorityWeights = { high: 50, medium: 30, low: 10 };
+    score += priorityWeights[task.priority] || 20;
+    
+    // Age weight (older tasks get higher score)
+    const daysSinceCreated = (Date.now() - new Date(task.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+    score += Math.min(daysSinceCreated * 5, 30); // Max 30 points for age
+    
+    // Obsidian-specific bonuses
+    if (task.filePath.includes('daily') || task.filePath.includes('today')) {
+      score += 20; // Daily notes get priority
+    }
+    
+    if (task.title.toLowerCase().includes('urgent') || task.title.includes('!!!')) {
+      score += 25; // Explicitly marked urgent
+    }
+    
+    return score;
+  }
+
   onunload() {
     // Clean up intervals and detectors
     if (this.notificationInterval) {
       clearInterval(this.notificationInterval);
+    }
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
     }
     this.patternDetector?.stopDetection();
   }
@@ -985,6 +1189,130 @@ class ProactivitySettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.obsidianIntegration.enableProgressTracking)
         .onChange(async (value) => {
           this.plugin.settings.obsidianIntegration.enableProgressTracking = value;
+          await this.plugin.saveSettings();
+        }));
+
+    // Browser Extension Sync Settings
+    containerEl.createEl('h3', { text: 'Browser Extension Sync' });
+    
+    containerEl.createEl('p', { 
+      text: '🔄 Sync tasks, energy levels, and focus sessions with the Proactivity browser extension.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Enable Browser Extension Sync')
+      .setDesc('Sync data with browser extension via localStorage and API')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.browserExtensionSync.enableSync)
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.enableSync = value;
+          await this.plugin.saveSettings();
+          
+          // Restart sync if enabled, stop if disabled
+          if (value) {
+            this.plugin.startBrowserExtensionSync();
+          } else if (this.plugin.syncInterval) {
+            clearInterval(this.plugin.syncInterval);
+          }
+        }));
+
+    new Setting(containerEl)
+      .setName('Sync Interval (minutes)')
+      .setDesc('How often to sync with browser extension')
+      .addSlider(slider => slider
+        .setLimits(1, 30, 1)
+        .setValue(this.plugin.settings.browserExtensionSync.syncInterval)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.syncInterval = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Sync Tasks')
+      .setDesc('Share tasks between Obsidian and browser extension')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.browserExtensionSync.syncTasks)
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.syncTasks = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Sync Energy Levels')
+      .setDesc('Share energy level settings between platforms')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.browserExtensionSync.syncEnergyLevels)
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.syncEnergyLevels = value;
+          await this.plugin.saveSettings();
+        }));
+
+    // Enforcement Settings
+    containerEl.createEl('h3', { text: 'Productivity Enforcement' });
+    
+    containerEl.createEl('p', { 
+      text: '🔒 Configure strict productivity enforcement to help maintain focus.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Enable Strict Mode')
+      .setDesc('Block all websites until daily tasks are completed')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.enforcement.enableStrictMode)
+        .onChange(async (value) => {
+          this.plugin.settings.enforcement.enableStrictMode = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Block All Websites')
+      .setDesc('When strict mode is active, block all web browsing')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.enforcement.blockAllWebsites)
+        .onChange(async (value) => {
+          this.plugin.settings.enforcement.blockAllWebsites = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Require Daily Task Completion')
+      .setDesc('Unlock web browsing only after completing at least one task')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.enforcement.requireDailyTaskCompletion)
+        .onChange(async (value) => {
+          this.plugin.settings.enforcement.requireDailyTaskCompletion = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Allowed Domains')
+      .setDesc('Domains that remain accessible even in strict mode (comma-separated)')
+      .addTextArea(text => text
+        .setPlaceholder('localhost, obsidian.md, github.com')
+        .setValue(this.plugin.settings.enforcement.allowedDomains.join(', '))
+        .onChange(async (value) => {
+          this.plugin.settings.enforcement.allowedDomains = value.split(',').map(d => d.trim());
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Enforcement Hours')
+      .setDesc('Active enforcement time range')
+      .addText(text => text
+        .setPlaceholder('09:00')
+        .setValue(this.plugin.settings.enforcement.enforcementStartTime)
+        .onChange(async (value) => {
+          this.plugin.settings.enforcement.enforcementStartTime = value;
+          await this.plugin.saveSettings();
+        }))
+      .addText(text => text
+        .setPlaceholder('17:00')
+        .setValue(this.plugin.settings.enforcement.enforcementEndTime)
+        .onChange(async (value) => {
+          this.plugin.settings.enforcement.enforcementEndTime = value;
           await this.plugin.saveSettings();
         }));
   }

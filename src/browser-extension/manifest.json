@@ -10,7 +10,9 @@
     "notifications",
     "alarms",
     "scripting",
-    "webRequest"
+    "webRequest",
+    "webRequestBlocking",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -49,7 +51,7 @@
   "options_page": "options.html",
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png", "options.html", "popup.html", "tasks.html", "dashboard.html", "dashboard.js"],
+      "resources": ["icons/*.png", "options.html", "popup.html", "tasks.html", "dashboard.html", "dashboard.js", "blocked.html"],
       "matches": ["<all_urls>"]
     }
   ],

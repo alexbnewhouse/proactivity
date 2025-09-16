@@ -362,6 +362,16 @@ class ProactivityDashboard {
     this.calculateStats();
     this.updateUI();
 
+    // Notify background script about task completion for enforcement
+    try {
+      chrome.runtime.sendMessage({
+        action: 'taskCompleted',
+        task: task
+      });
+    } catch (error) {
+      console.log('Could not notify background script:', error);
+    }
+
     // Sync with backend
     this.syncWithBackend('task-updated', task);
   }
@@ -522,14 +532,17 @@ class ProactivityDashboard {
 
   // Enforcement testing functions
   async testNotifications() {
-    this.showNotification('🔔 Test Notification', 'This is a test notification from the enforcement system');
-    
-    // Also try browser notification if permission granted
-    if (Notification.permission === 'granted') {
-      new Notification('Proactivity Test', {
-        body: 'This is a browser notification test',
-        icon: chrome.runtime.getURL('icons/icon48.png')
+    // Test system notification
+    try {
+      await chrome.notifications.create('proactivity-test-' + Date.now(), {
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL('icons/icon48.png'),
+        title: '🔔 Test Notification',
+        message: 'This is a test system notification from Proactivity'
       });
+    } catch (error) {
+      console.error('System notification failed:', error);
+      this.showNotification('🔔 Test Notification', 'System notifications may not be available');
     }
   }
 
