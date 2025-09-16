@@ -3,6 +3,7 @@ import { ProactivityView, VIEW_TYPE_PROACTIVITY } from './proactive-view';
 import { TaskBreakdownModal } from './task-breakdown-modal';
 import { ADHDPatternDetector } from './adhd-pattern-detector';
 import { ObsidianIntegrationService } from './obsidian-integration-service';
+import { ObsidianSyncService } from './obsidian-sync-service';
 
 // Default settings based on ADHD research
 export interface ProactivitySettings {
@@ -99,6 +100,7 @@ export default class ProactivityPlugin extends Plugin {
   settings: ProactivitySettings;
   patternDetector: ADHDPatternDetector;
   integrationService: ObsidianIntegrationService;
+  syncService: ObsidianSyncService;
   private statusBarItem: HTMLElement;
   private notificationInterval: NodeJS.Timeout;
   syncInterval: NodeJS.Timeout;
@@ -109,6 +111,7 @@ export default class ProactivityPlugin extends Plugin {
 
       // Initialize core services
       this.integrationService = new ObsidianIntegrationService(this.app, this.settings);
+      this.syncService = new ObsidianSyncService(this.settings);
       this.patternDetector = new ADHDPatternDetector(this.app, this.settings);
 
       // Add status bar item early to prevent undefined errors
@@ -125,8 +128,14 @@ export default class ProactivityPlugin extends Plugin {
       );
 
       // Add ribbon icon for quick access
-      this.addRibbonIcon('brain', 'Proactivity', () => {
+      this.addRibbonIcon('brain', 'Proactivity Dashboard', () => {
         this.activateView();
+      });
+
+      // Add AI helper ribbon icon
+      this.addRibbonIcon('bot', 'AI Task Breakdown Assistant', () => {
+        const activeFile = this.app.workspace.getActiveFile();
+        this.openTaskBreakdownModal(activeFile);
       });
 
       // Status bar already initialized above
@@ -144,6 +153,9 @@ export default class ProactivityPlugin extends Plugin {
       if (this.settings.enableProactiveNotifications) {
         this.startProactiveNotifications();
       }
+
+      // Start status bar updates to show sync status
+      this.startStatusBarUpdates();
 
       // Start browser extension sync if enabled
       if (this.settings.browserExtensionSync.enableSync) {
@@ -357,6 +369,7 @@ export default class ProactivityPlugin extends Plugin {
       clearInterval(this.syncInterval);
     }
     this.patternDetector?.stopDetection();
+    this.syncService?.destroy();
   }
 
   async loadSettings() {
@@ -368,11 +381,23 @@ export default class ProactivityPlugin extends Plugin {
 
     // Update services with new settings
     this.integrationService?.updateSettings(this.settings);
+    this.syncService?.updateSettings(this.settings);
     this.patternDetector?.updateSettings(this.settings);
   }
 
   registerCommands() {
-    // Quick task breakdown command
+    // AI Task Breakdown - Main feature
+    this.addCommand({
+      id: 'ai-task-breakdown',
+      name: '🤖 AI Task Breakdown Assistant',
+      hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'a' }],
+      callback: () => {
+        const activeFile = this.app.workspace.getActiveFile();
+        this.openTaskBreakdownModal(activeFile);
+      }
+    });
+
+    // Quick task breakdown command (legacy)
     this.addCommand({
       id: 'breakdown-current-task',
       name: 'Break down current task',
@@ -419,6 +444,15 @@ export default class ProactivityPlugin extends Plugin {
       name: 'Celebrate progress made',
       callback: () => {
         this.celebrateProgress();
+      }
+    });
+
+    // Manual sync with browser extension
+    this.addCommand({
+      id: 'sync-with-extension',
+      name: '🔄 Sync with Browser Extension',
+      callback: () => {
+        this.syncService.triggerManualSync();
       }
     });
 
@@ -1077,8 +1111,28 @@ export default class ProactivityPlugin extends Plugin {
 
   updateStatusBar(status: string) {
     if (this.statusBarItem) {
-      this.statusBarItem.setText(`Proactivity: ${status}`);
+      let displayStatus = status;
+      
+      // Add sync status if available
+      if (this.syncService) {
+        const syncStatus = this.syncService.getSyncStatus();
+        const syncIcon = syncStatus.isOnline ? '🔄' : '⏸️';
+        const queueInfo = syncStatus.queuedItems > 0 ? ` (${syncStatus.queuedItems})` : '';
+        displayStatus = `${status} ${syncIcon}${queueInfo}`;
+      }
+      
+      this.statusBarItem.setText(`Proactivity: ${displayStatus}`);
     }
+  }
+
+  /**
+   * Start periodic status bar updates to show sync status
+   */
+  startStatusBarUpdates() {
+    // Update status bar every 30 seconds
+    setInterval(() => {
+      this.updateStatusBar('Ready');
+    }, 30000);
   }
 }
 
@@ -1222,13 +1276,70 @@ class ProactivitySettingTab extends PluginSettingTab {
         .onChange(async (value) => {
           this.plugin.settings.browserExtensionSync.enableSync = value;
           await this.plugin.saveSettings();
-          
-          // Restart sync if enabled, stop if disabled
-          if (value) {
-            this.plugin.startBrowserExtensionSync();
-          } else if (this.plugin.syncInterval) {
-            clearInterval(this.plugin.syncInterval);
-          }
+        }));
+
+    new Setting(containerEl)
+      .setName('Sync Tasks')
+      .setDesc('Share task lists between Obsidian and browser extension')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.browserExtensionSync.syncTasks)
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.syncTasks = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Sync Energy Levels')
+      .setDesc('Share energy tracking between platforms')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.browserExtensionSync.syncEnergyLevels)
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.syncEnergyLevels = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Sync Focus Sessions')
+      .setDesc('Track focus sessions across both platforms')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.browserExtensionSync.syncFocusSessions)
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.syncFocusSessions = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Sync Interval')
+      .setDesc('How often to sync with browser extension (minutes)')
+      .addSlider(slider => slider
+        .setLimits(1, 30, 1)
+        .setValue(this.plugin.settings.browserExtensionSync.syncInterval)
+        .setDynamicTooltip()
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.syncInterval = value;
+          await this.plugin.saveSettings();
+        }));
+
+    // Sync status display
+    const syncStatus = this.plugin.syncService?.getSyncStatus();
+    if (syncStatus) {
+      const statusText = syncStatus.isOnline 
+        ? `🟢 Online • Last sync: ${syncStatus.lastSync ? new Date(syncStatus.lastSync).toLocaleTimeString() : 'Never'} • Queued: ${syncStatus.queuedItems}`
+        : '🔴 Offline • Will sync when connection is restored';
+      
+      new Setting(containerEl)
+        .setName('Sync Status')
+        .setDesc(statusText);
+    }
+
+    new Setting(containerEl)
+      .setName('Enable Browser Extension Sync')
+      .setDesc('Sync data with browser extension via localStorage and API')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.browserExtensionSync.enableSync)
+        .onChange(async (value) => {
+          this.plugin.settings.browserExtensionSync.enableSync = value;
+          await this.plugin.saveSettings();
         }));
 
     new Setting(containerEl)

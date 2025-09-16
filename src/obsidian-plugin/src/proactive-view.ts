@@ -207,7 +207,13 @@ export class ProactivityView extends ItemView {
     });
 
     planningButton.addEventListener('click', () => {
-      this.openAIProjectPlanningModal();
+      // Open the task breakdown modal instead
+      const modal = new (require('./task-breakdown-modal').TaskBreakdownModal)(
+        this.app,
+        this.settings,
+        this.integrationService
+      );
+      modal.open();
     });
 
     // Load existing tasks
@@ -847,7 +853,8 @@ export class ProactivityView extends ItemView {
 
   private startBreathingExercise() {
     // Guide through breathing exercise
-    const modal = new BreathingModal(this.app);
+    const energyLevel = typeof this.currentEnergyLevel === 'string' ? 3 : this.currentEnergyLevel;
+    const modal = new BreathingModal(this.app, this.integrationService, energyLevel);
     modal.open();
   }
 
@@ -904,7 +911,11 @@ export class ProactivityView extends ItemView {
 
 // Simple breathing exercise modal
 class BreathingModal extends Modal {
-  constructor(app: App) {
+  constructor(
+    app: App, 
+    private integrationService?: any,
+    private currentEnergyLevel: number = 3
+  ) {
     super(app);
   }
 

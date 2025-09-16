@@ -7,6 +7,9 @@ var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -21,210 +24,620 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
+// src/api-client.ts
+var import_obsidian, ProactivityApiClient;
+var init_api_client = __esm({
+  "src/api-client.ts"() {
+    import_obsidian = require("obsidian");
+    ProactivityApiClient = class {
+      constructor(settings) {
+        this.settings = settings;
+        this.baseUrl = settings.serverUrl || "http://localhost:3001";
+      }
+      updateSettings(settings) {
+        this.settings = settings;
+        this.baseUrl = settings.serverUrl || "http://localhost:3001";
+      }
+      /**
+       * Make HTTP request with error handling
+       */
+      async makeRequest(endpoint, options = {}) {
+        const url = `${this.baseUrl}/api${endpoint}`;
+        const defaultOptions = {
+          headers: {
+            "Content-Type": "application/json",
+            ...options.headers
+          },
+          ...options
+        };
+        try {
+          const response = await fetch(url, defaultOptions);
+          const data = await response.json();
+          if (!response.ok) {
+            const error = data;
+            throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
+          }
+          return data;
+        } catch (error) {
+          if (error instanceof TypeError && error.message.includes("fetch")) {
+            throw new Error("Unable to connect to Proactivity server. Please check that the backend is running.");
+          }
+          throw error;
+        }
+      }
+      /**
+       * Test connection to backend
+       */
+      async testConnection() {
+        try {
+          const response = await fetch(`${this.baseUrl}/health`);
+          return response.ok;
+        } catch (error) {
+          return false;
+        }
+      }
+      /**
+       * Get health status from backend
+       */
+      async getHealth() {
+        return this.makeRequest("/health");
+      }
+      /**
+       * Break down a task into ADHD-friendly micro-tasks
+       */
+      async breakdownTask(request) {
+        return this.makeRequest("/tasks/breakdown", {
+          method: "POST",
+          body: JSON.stringify(request)
+        });
+      }
+      /**
+       * Get task suggestions based on current context
+       */
+      async getTaskSuggestions(energyLevel = "moderate", availableTime = 30, category) {
+        const params = new URLSearchParams({
+          energyLevel,
+          availableTime: availableTime.toString()
+        });
+        if (category) {
+          params.append("category", category);
+        }
+        return this.makeRequest(`/tasks/suggestions?${params}`);
+      }
+      /**
+       * Start tracking a task
+       */
+      async startTask(taskId, estimatedDuration) {
+        return this.makeRequest("/tasks/start", {
+          method: "POST",
+          body: JSON.stringify({
+            taskId,
+            estimatedDuration,
+            userId: "obsidian_user"
+            // Could be made configurable
+          })
+        });
+      }
+      /**
+       * Mark task as completed
+       */
+      async completeTask(taskId, actualDuration, difficulty, notes) {
+        return this.makeRequest("/tasks/complete", {
+          method: "POST",
+          body: JSON.stringify({
+            taskId,
+            actualDuration,
+            difficulty,
+            notes,
+            userId: "obsidian_user"
+          })
+        });
+      }
+      /**
+       * Get task templates for common dissertation activities
+       */
+      async getTaskTemplates() {
+        return this.makeRequest("/tasks/templates");
+      }
+      /**
+       * Update user energy level
+       */
+      async updateEnergyLevel(energyLevel) {
+        return this.makeRequest("/users/energy-log", {
+          method: "POST",
+          body: JSON.stringify({
+            energyLevel,
+            timestamp: new Date().toISOString(),
+            userId: "obsidian_user"
+          })
+        });
+      }
+      /**
+       * Record user activity for pattern detection
+       */
+      async recordActivity(activityType, data) {
+        return this.makeRequest("/patterns/detect", {
+          method: "POST",
+          body: JSON.stringify({
+            type: activityType,
+            data,
+            timestamp: new Date().toISOString(),
+            userId: "obsidian_user"
+          })
+        });
+      }
+      /**
+       * Get ADHD patterns and insights
+       */
+      async getPatterns() {
+        return this.makeRequest("/patterns/insights");
+      }
+      /**
+       * Safe wrapper for API calls with user feedback
+       */
+      async safeApiCall(operation, fallback, errorMessage) {
+        try {
+          return await operation();
+        } catch (error) {
+          console.error("API call failed:", error);
+          const message = errorMessage || "API request failed. Please check your connection and backend server.";
+          new import_obsidian.Notice(`\u26A0\uFE0F ${message}`, 5e3);
+          if (fallback !== void 0) {
+            return fallback;
+          }
+          return void 0;
+        }
+      }
+      /**
+       * Convert task breakdown response to format expected by UI
+       */
+      static formatBreakdownForUI(response) {
+        if (!response.success || !response.data) {
+          throw new Error("Invalid breakdown response");
+        }
+        const { data } = response;
+        return {
+          motivation: `Great choice! I've broken this down into ${data.microTasks.length} manageable steps. \u{1F3AF}`,
+          steps: data.microTasks.map((task, index) => ({
+            id: task.id || `step_${index}`,
+            title: task.title,
+            description: task.description,
+            estimatedMinutes: task.estimatedMinutes || 20,
+            complexity: task.complexity || "simple",
+            tips: task.motivationBooster ? [task.motivationBooster] : [],
+            energyRequired: task.energyRequired || "moderate",
+            executiveFunctionDemands: task.executiveFunctionDemands || [],
+            tools: task.tools || [],
+            completionCriteria: task.completionCriteria || "Step completed"
+          })),
+          totalEstimatedTime: data.totalEstimatedTime,
+          strategy: data.breakdownStrategy,
+          optimizations: data.adhdOptimizations
+        };
+      }
+    };
+  }
+});
+
+// src/task-breakdown-modal.ts
+var task_breakdown_modal_exports = {};
+__export(task_breakdown_modal_exports, {
+  TaskBreakdownModal: () => TaskBreakdownModal
+});
+var import_obsidian2, TaskBreakdownModal;
+var init_task_breakdown_modal = __esm({
+  "src/task-breakdown-modal.ts"() {
+    import_obsidian2 = require("obsidian");
+    init_api_client();
+    TaskBreakdownModal = class extends import_obsidian2.Modal {
+      constructor(app, settings, integrationService, sourceFile) {
+        super(app);
+        this.selectedText = "";
+        this.isProcessing = false;
+        this.settings = settings;
+        this.integrationService = integrationService;
+        this.apiClient = new ProactivityApiClient(settings);
+        this.sourceFile = sourceFile || null;
+      }
+      async onOpen() {
+        var _a;
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.addClass("proactive-task-breakdown-modal");
+        this.selectedText = await this.integrationService.getSelectedText() || "";
+        this.createHeader();
+        this.createTaskInputSection();
+        this.createContextSection();
+        this.createOptionsSection();
+        this.createActionButtons();
+        this.createBreakdownDisplay();
+        if (this.selectedText) {
+          this.taskInput.value = `Work on: "${this.selectedText.substring(0, 100)}..."`;
+          this.contextInput.value = `Selected text from ${((_a = this.sourceFile) == null ? void 0 : _a.name) || "current file"}`;
+        } else if (this.sourceFile) {
+          this.taskInput.value = `Continue work on ${this.sourceFile.name}`;
+          this.contextInput.value = `Working on file: ${this.sourceFile.path}`;
+        }
+      }
+      createHeader() {
+        const { contentEl } = this;
+        const header = contentEl.createEl("div", { cls: "modal-header" });
+        header.createEl("h2", { text: "\u{1F528} AI Task Breakdown" });
+        header.createEl("p", {
+          text: "Break down overwhelming tasks into ADHD-friendly micro-steps",
+          cls: "modal-subtitle"
+        });
+      }
+      createTaskInputSection() {
+        const { contentEl } = this;
+        const section = contentEl.createEl("div", { cls: "input-section" });
+        section.createEl("label", { text: "What do you want to work on?" });
+        this.taskInput = section.createEl("input", {
+          type: "text",
+          placeholder: 'e.g., "Write the methodology section" or "Analyze survey data"',
+          cls: "task-input"
+        });
+        const suggestions = section.createEl("div", { cls: "quick-suggestions" });
+        suggestions.createEl("span", { text: "Quick suggestions: " });
+        const suggestionItems = [
+          "Write one paragraph",
+          "Review one paper",
+          "Organize notes",
+          "Plan next section"
+        ];
+        suggestionItems.forEach((suggestion) => {
+          const button = suggestions.createEl("button", {
+            text: suggestion,
+            cls: "suggestion-btn"
+          });
+          button.onclick = () => {
+            this.taskInput.value = suggestion;
+          };
+        });
+      }
+      createContextSection() {
+        const { contentEl } = this;
+        const section = contentEl.createEl("div", { cls: "input-section" });
+        section.createEl("label", { text: "Additional context (optional)" });
+        this.contextInput = section.createEl("textarea", {
+          placeholder: "Any relevant details, constraints, or background information...",
+          cls: "context-input"
+        });
+      }
+      createOptionsSection() {
+        const { contentEl } = this;
+        const section = contentEl.createEl("div", { cls: "options-section" });
+        const depthContainer = section.createEl("div", { cls: "option-container" });
+        depthContainer.createEl("label", { text: "Breakdown detail level" });
+        this.depthSlider = depthContainer.createEl("input", {
+          type: "range",
+          cls: "depth-slider"
+        });
+        this.depthSlider.min = "1";
+        this.depthSlider.max = "5";
+        this.depthSlider.value = this.settings.defaultBreakdownDepth.toString();
+        const depthLabel = depthContainer.createEl("span", {
+          text: this.getDepthLabel(this.settings.defaultBreakdownDepth),
+          cls: "depth-label"
+        });
+        this.depthSlider.oninput = () => {
+          const depth = parseInt(this.depthSlider.value);
+          depthLabel.textContent = this.getDepthLabel(depth);
+        };
+        const energyContainer = section.createEl("div", { cls: "option-container" });
+        energyContainer.createEl("label", { text: "Your current energy level" });
+        this.energySelect = energyContainer.createEl("select", { cls: "energy-select" });
+        const energyOptions = [
+          { value: "high", text: "\u26A1 High - Ready for complex tasks" },
+          { value: "moderate", text: "\u{1F50B} Moderate - Normal capacity" },
+          { value: "low", text: "\u{1FAAB} Low - Simple tasks only" },
+          { value: "depleted", text: "\u{1F634} Depleted - Need rest/micro-tasks" }
+        ];
+        energyOptions.forEach((option) => {
+          const optionEl = this.energySelect.createEl("option", {
+            value: option.value,
+            text: option.text
+          });
+          if (option.value === "moderate") {
+            optionEl.selected = true;
+          }
+        });
+        const timeContainer = section.createEl("div", { cls: "option-container" });
+        timeContainer.createEl("label", { text: "Available time (minutes)" });
+        this.timeInput = timeContainer.createEl("input", {
+          type: "number",
+          cls: "time-input"
+        });
+        this.timeInput.min = "5";
+        this.timeInput.max = "180";
+        this.timeInput.value = "30";
+      }
+      createActionButtons() {
+        const { contentEl } = this;
+        const buttonContainer = contentEl.createEl("div", { cls: "button-container" });
+        const breakdownBtn = buttonContainer.createEl("button", {
+          text: "\u{1F916} Break Down Task",
+          cls: "mod-cta breakdown-btn"
+        });
+        breakdownBtn.onclick = () => this.performBreakdown();
+        const cancelBtn = buttonContainer.createEl("button", {
+          text: "Cancel",
+          cls: "cancel-btn"
+        });
+        cancelBtn.onclick = () => this.close();
+      }
+      createBreakdownDisplay() {
+        const { contentEl } = this;
+        this.breakdownContainer = contentEl.createEl("div", { cls: "breakdown-container" });
+      }
+      getDepthLabel(depth) {
+        const labels = {
+          1: "Basic (2-3 steps)",
+          2: "Simple (3-5 steps)",
+          3: "Detailed (5-8 steps)",
+          4: "Very Detailed (8-12 steps)",
+          5: "Micro-steps (12+ steps)"
+        };
+        return labels[depth] || "Detailed";
+      }
+      async performBreakdown() {
+        var _a;
+        if (this.isProcessing)
+          return;
+        const task = this.taskInput.value.trim();
+        if (!task) {
+          new import_obsidian2.Notice("Please enter a task to break down");
+          return;
+        }
+        this.isProcessing = true;
+        this.showProcessingState();
+        try {
+          const breakdown = await this.requestTaskBreakdown({
+            task,
+            context: this.contextInput.value.trim(),
+            depth: parseInt(this.depthSlider.value),
+            energyLevel: this.energySelect.value,
+            availableTime: parseInt(this.timeInput.value),
+            sourceFile: (_a = this.sourceFile) == null ? void 0 : _a.path,
+            selectedText: this.selectedText
+          });
+          this.displayBreakdown(breakdown);
+        } catch (error) {
+          console.error("Task breakdown error:", error);
+          this.showError("Failed to break down task. Please try again.");
+        } finally {
+          this.isProcessing = false;
+        }
+      }
+      showProcessingState() {
+        this.breakdownContainer.empty();
+        this.breakdownContainer.addClass("processing");
+        const processing = this.breakdownContainer.createEl("div", { cls: "processing-message" });
+        processing.createEl("div", { cls: "spinner" });
+        processing.createEl("p", { text: "\u{1F916} Breaking down your task into ADHD-friendly steps..." });
+        processing.createEl("p", {
+          text: "This usually takes 10-15 seconds",
+          cls: "processing-subtitle"
+        });
+      }
+      showError(message) {
+        this.breakdownContainer.empty();
+        this.breakdownContainer.removeClass("processing");
+        const error = this.breakdownContainer.createEl("div", { cls: "error-message" });
+        error.createEl("p", { text: "\u274C " + message });
+        const retryBtn = error.createEl("button", {
+          text: "Try Again",
+          cls: "retry-btn"
+        });
+        retryBtn.onclick = () => this.performBreakdown();
+      }
+      displayBreakdown(breakdown) {
+        this.breakdownContainer.empty();
+        this.breakdownContainer.removeClass("processing");
+        if (!breakdown || !breakdown.steps || breakdown.steps.length === 0) {
+          this.showError("No breakdown steps received");
+          return;
+        }
+        const header = this.breakdownContainer.createEl("div", { cls: "breakdown-header" });
+        header.createEl("h3", { text: "\u2728 Your ADHD-Friendly Task Breakdown" });
+        if (breakdown.motivation) {
+          header.createEl("p", {
+            text: breakdown.motivation,
+            cls: "motivation-message"
+          });
+        }
+        const stepsList = this.breakdownContainer.createEl("div", { cls: "steps-list" });
+        breakdown.steps.forEach((step, index) => {
+          const stepEl = stepsList.createEl("div", { cls: "breakdown-step" });
+          const stepHeader = stepEl.createEl("div", { cls: "step-header" });
+          stepHeader.createEl("span", {
+            text: `${index + 1}.`,
+            cls: "step-number"
+          });
+          stepHeader.createEl("h4", {
+            text: step.title,
+            cls: "step-title"
+          });
+          stepHeader.createEl("span", {
+            text: `\u23F1\uFE0F ${step.estimatedMinutes}min`,
+            cls: "step-time"
+          });
+          if (step.description) {
+            stepEl.createEl("p", {
+              text: step.description,
+              cls: "step-description"
+            });
+          }
+          if (step.tips && step.tips.length > 0) {
+            const tipsList = stepEl.createEl("ul", { cls: "step-tips" });
+            step.tips.forEach((tip) => {
+              tipsList.createEl("li", { text: tip });
+            });
+          }
+          const stepActions = stepEl.createEl("div", { cls: "step-actions" });
+          const startBtn = stepActions.createEl("button", {
+            text: "\u25B6\uFE0F Start",
+            cls: "step-start-btn"
+          });
+          startBtn.onclick = () => this.startStep(step);
+          const addToVaultBtn = stepActions.createEl("button", {
+            text: "\u{1F4DD} Add to Daily Note",
+            cls: "step-add-btn"
+          });
+          addToVaultBtn.onclick = () => this.addStepToVault(step);
+        });
+        const footer = this.breakdownContainer.createEl("div", { cls: "breakdown-footer" });
+        const addAllBtn = footer.createEl("button", {
+          text: "\u{1F4CB} Add All Steps to Daily Note",
+          cls: "mod-cta"
+        });
+        addAllBtn.onclick = () => this.addAllStepsToVault(breakdown.steps);
+        const newBreakdownBtn = footer.createEl("button", {
+          text: "\u{1F504} Try Different Breakdown",
+          cls: "secondary-btn"
+        });
+        newBreakdownBtn.onclick = () => {
+          this.breakdownContainer.empty();
+        };
+      }
+      // Use the integrated approach from ObsidianIntegrationService which has both OpenAI direct and fallback
+      async requestTaskBreakdown(params) {
+        return await this.integrationService.breakdownTask(params.task, {
+          energyLevel: params.energyLevel,
+          depth: params.depth,
+          availableTime: params.availableTime,
+          context: params.context || ""
+        });
+      }
+      async startStep(step) {
+        await this.integrationService.startTask({
+          title: step.title,
+          description: step.description,
+          estimatedMinutes: step.estimatedMinutes,
+          complexity: step.complexity
+        });
+        new import_obsidian2.Notice(`Started: ${step.title} (${step.estimatedMinutes}min)`);
+        this.close();
+      }
+      async addStepToVault(step) {
+        const dailyNotePath = await this.getDailyNotePath();
+        if (!dailyNotePath) {
+          new import_obsidian2.Notice("Unable to find daily note");
+          return;
+        }
+        try {
+          const file = await this.getOrCreateFile(dailyNotePath);
+          const content = await this.app.vault.read(file);
+          const taskEntry = `- [ ] ${step.title} (${step.estimatedMinutes}min)${step.description ? ` - ${step.description}` : ""}
+`;
+          const updatedContent = this.updateTasksSection(content, taskEntry);
+          await this.app.vault.modify(file, updatedContent);
+          new import_obsidian2.Notice(`Added "${step.title}" to daily note`);
+        } catch (error) {
+          console.error("Error adding step to vault:", error);
+          new import_obsidian2.Notice("Error adding step to daily note");
+        }
+      }
+      async addAllStepsToVault(steps) {
+        const dailyNotePath = await this.getDailyNotePath();
+        if (!dailyNotePath) {
+          new import_obsidian2.Notice("Unable to find daily note");
+          return;
+        }
+        try {
+          const file = await this.getOrCreateFile(dailyNotePath);
+          const content = await this.app.vault.read(file);
+          const taskEntries = steps.map(
+            (step) => `- [ ] ${step.title} (${step.estimatedMinutes}min)${step.description ? ` - ${step.description}` : ""}`
+          ).join("\n") + "\n";
+          const updatedContent = this.updateTasksSection(content, taskEntries);
+          await this.app.vault.modify(file, updatedContent);
+          new import_obsidian2.Notice(`Added ${steps.length} tasks to daily note`);
+          this.close();
+        } catch (error) {
+          console.error("Error adding steps to vault:", error);
+          new import_obsidian2.Notice("Error adding tasks to daily note");
+        }
+      }
+      async getDailyNotePath() {
+        const today = new Date().toISOString().split("T")[0];
+        const dailyNoteFolder = this.settings.obsidianIntegration.dailyNotePath;
+        return `${dailyNoteFolder}/${today}.md`;
+      }
+      async getOrCreateFile(path) {
+        let file = this.app.vault.getAbstractFileByPath(path);
+        if (!file) {
+          const template = this.createDailyNoteTemplate();
+          file = await this.app.vault.create(path, template);
+        }
+        return file;
+      }
+      createDailyNoteTemplate() {
+        const today = new Date().toLocaleDateString();
+        return `# Daily Note - ${today}
+
+${this.settings.obsidianIntegration.taskTagPrefix}/daily-note
+
+## Energy Tracking
+
+## Current Focus
+
+## Tasks
+
+## Progress
+
+## Celebrations
+
+## Reflections
+
+---
+*Generated by Proactivity*`;
+      }
+      updateTasksSection(content, newTasks) {
+        const tasksSection = "## Tasks";
+        const sectionRegex = new RegExp(`(${tasksSection}\\n)[\\s\\S]*?(?=\\n## |\\n---|$)`, "i");
+        if (sectionRegex.test(content)) {
+          return content.replace(sectionRegex, `${tasksSection}
+
+${newTasks}`);
+        } else {
+          const dividerIndex = content.lastIndexOf("\n---");
+          if (dividerIndex !== -1) {
+            return content.slice(0, dividerIndex) + `
+${tasksSection}
+
+${newTasks}
+` + content.slice(dividerIndex);
+          } else {
+            return content + `
+
+${tasksSection}
+
+${newTasks}`;
+          }
+        }
+      }
+      onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+      }
+    };
+  }
+});
+
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
   default: () => ProactivityPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/proactive-view.ts
-var import_obsidian2 = require("obsidian");
-
-// src/api-client.ts
-var import_obsidian = require("obsidian");
-var ProactivityApiClient = class {
-  constructor(settings) {
-    this.settings = settings;
-    this.baseUrl = settings.serverUrl || "http://localhost:3001";
-  }
-  updateSettings(settings) {
-    this.settings = settings;
-    this.baseUrl = settings.serverUrl || "http://localhost:3001";
-  }
-  /**
-   * Make HTTP request with error handling
-   */
-  async makeRequest(endpoint, options = {}) {
-    const url = `${this.baseUrl}/api${endpoint}`;
-    const defaultOptions = {
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers
-      },
-      ...options
-    };
-    try {
-      const response = await fetch(url, defaultOptions);
-      const data = await response.json();
-      if (!response.ok) {
-        const error = data;
-        throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-      return data;
-    } catch (error) {
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        throw new Error("Unable to connect to Proactivity server. Please check that the backend is running.");
-      }
-      throw error;
-    }
-  }
-  /**
-   * Test connection to backend
-   */
-  async testConnection() {
-    try {
-      const response = await fetch(`${this.baseUrl}/health`);
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
-  }
-  /**
-   * Get health status from backend
-   */
-  async getHealth() {
-    return this.makeRequest("/health");
-  }
-  /**
-   * Break down a task into ADHD-friendly micro-tasks
-   */
-  async breakdownTask(request) {
-    return this.makeRequest("/tasks/breakdown", {
-      method: "POST",
-      body: JSON.stringify(request)
-    });
-  }
-  /**
-   * Get task suggestions based on current context
-   */
-  async getTaskSuggestions(energyLevel = "moderate", availableTime = 30, category) {
-    const params = new URLSearchParams({
-      energyLevel,
-      availableTime: availableTime.toString()
-    });
-    if (category) {
-      params.append("category", category);
-    }
-    return this.makeRequest(`/tasks/suggestions?${params}`);
-  }
-  /**
-   * Start tracking a task
-   */
-  async startTask(taskId, estimatedDuration) {
-    return this.makeRequest("/tasks/start", {
-      method: "POST",
-      body: JSON.stringify({
-        taskId,
-        estimatedDuration,
-        userId: "obsidian_user"
-        // Could be made configurable
-      })
-    });
-  }
-  /**
-   * Mark task as completed
-   */
-  async completeTask(taskId, actualDuration, difficulty, notes) {
-    return this.makeRequest("/tasks/complete", {
-      method: "POST",
-      body: JSON.stringify({
-        taskId,
-        actualDuration,
-        difficulty,
-        notes,
-        userId: "obsidian_user"
-      })
-    });
-  }
-  /**
-   * Get task templates for common dissertation activities
-   */
-  async getTaskTemplates() {
-    return this.makeRequest("/tasks/templates");
-  }
-  /**
-   * Update user energy level
-   */
-  async updateEnergyLevel(energyLevel) {
-    return this.makeRequest("/users/energy-log", {
-      method: "POST",
-      body: JSON.stringify({
-        energyLevel,
-        timestamp: new Date().toISOString(),
-        userId: "obsidian_user"
-      })
-    });
-  }
-  /**
-   * Record user activity for pattern detection
-   */
-  async recordActivity(activityType, data) {
-    return this.makeRequest("/patterns/detect", {
-      method: "POST",
-      body: JSON.stringify({
-        type: activityType,
-        data,
-        timestamp: new Date().toISOString(),
-        userId: "obsidian_user"
-      })
-    });
-  }
-  /**
-   * Get ADHD patterns and insights
-   */
-  async getPatterns() {
-    return this.makeRequest("/patterns/insights");
-  }
-  /**
-   * Safe wrapper for API calls with user feedback
-   */
-  async safeApiCall(operation, fallback, errorMessage) {
-    try {
-      return await operation();
-    } catch (error) {
-      console.error("API call failed:", error);
-      const message = errorMessage || "API request failed. Please check your connection and backend server.";
-      new import_obsidian.Notice(`\u26A0\uFE0F ${message}`, 5e3);
-      if (fallback !== void 0) {
-        return fallback;
-      }
-      return void 0;
-    }
-  }
-  /**
-   * Convert task breakdown response to format expected by UI
-   */
-  static formatBreakdownForUI(response) {
-    if (!response.success || !response.data) {
-      throw new Error("Invalid breakdown response");
-    }
-    const { data } = response;
-    return {
-      motivation: `Great choice! I've broken this down into ${data.microTasks.length} manageable steps. \u{1F3AF}`,
-      steps: data.microTasks.map((task, index) => ({
-        id: task.id || `step_${index}`,
-        title: task.title,
-        description: task.description,
-        estimatedMinutes: task.estimatedMinutes || 20,
-        complexity: task.complexity || "simple",
-        tips: task.motivationBooster ? [task.motivationBooster] : [],
-        energyRequired: task.energyRequired || "moderate",
-        executiveFunctionDemands: task.executiveFunctionDemands || [],
-        tools: task.tools || [],
-        completionCriteria: task.completionCriteria || "Step completed"
-      })),
-      totalEstimatedTime: data.totalEstimatedTime,
-      strategy: data.breakdownStrategy,
-      optimizations: data.adhdOptimizations
-    };
-  }
-};
-
-// src/proactive-view.ts
+var import_obsidian3 = require("obsidian");
+init_api_client();
 var VIEW_TYPE_PROACTIVITY = "proactivity-view";
-var ProactivityView = class extends import_obsidian2.ItemView {
+var ProactivityView = class extends import_obsidian3.ItemView {
   constructor(leaf, settings, integrationService) {
     super(leaf);
     this.currentEnergyLevel = "moderate";
@@ -338,6 +751,11 @@ var ProactivityView = class extends import_obsidian2.ItemView {
       cls: "add-task-btn",
       text: "+ Add"
     });
+    const planningSection = dashboardSection.createEl("div", { cls: "planning-section" });
+    const planningButton = planningSection.createEl("button", {
+      cls: "ai-planning-btn",
+      text: "\u{1F916} AI Project Planning"
+    });
     const taskListContainer = dashboardSection.createEl("div", { cls: "task-list-container" });
     const taskList = taskListContainer.createEl("div", { cls: "task-list" });
     const addTask = () => {
@@ -353,6 +771,14 @@ var ProactivityView = class extends import_obsidian2.ItemView {
       if (e.key === "Enter") {
         addTask();
       }
+    });
+    planningButton.addEventListener("click", () => {
+      const modal = new (init_task_breakdown_modal(), __toCommonJS(task_breakdown_modal_exports)).TaskBreakdownModal(
+        this.app,
+        this.settings,
+        this.integrationService
+      );
+      modal.open();
     });
     this.loadTasksFromVault(taskList);
     this.updateTaskStats();
@@ -449,7 +875,7 @@ var ProactivityView = class extends import_obsidian2.ItemView {
   async completeTask(taskTitle) {
     try {
       await this.integrationService.completeTask(taskTitle);
-      new import_obsidian2.Notice(`\u2705 Task completed: ${taskTitle}`);
+      new import_obsidian3.Notice(`\u2705 Task completed: ${taskTitle}`);
     } catch (error) {
       console.error("Failed to complete task:", error);
     }
@@ -461,11 +887,11 @@ var ProactivityView = class extends import_obsidian2.ItemView {
         depth: 2
       });
       if (breakdown && breakdown.steps) {
-        new import_obsidian2.Notice(`\u{1F528} Task broken down into ${breakdown.steps.length} steps`);
+        new import_obsidian3.Notice(`\u{1F528} Task broken down into ${breakdown.steps.length} steps`);
       }
     } catch (error) {
       console.error("Failed to breakdown task:", error);
-      new import_obsidian2.Notice("Failed to breakdown task. Check your OpenAI API key.");
+      new import_obsidian3.Notice("Failed to breakdown task. Check your OpenAI API key.");
     }
   }
   renderTaskSuggestionsSection(container) {
@@ -511,12 +937,12 @@ var ProactivityView = class extends import_obsidian2.ItemView {
         statusIcon.textContent = "\u{1F7E2}";
         statusText.textContent = "Sync successful";
         lastSyncDiv.querySelector(".last-sync-text").textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
-        new import_obsidian2.Notice("\u2705 Browser extension sync completed");
+        new import_obsidian3.Notice("\u2705 Browser extension sync completed");
       } catch (error) {
         statusIcon.textContent = "\u{1F534}";
         statusText.textContent = "Sync failed";
         console.error("Manual sync failed:", error);
-        new import_obsidian2.Notice("\u274C Sync failed. Check console for details.");
+        new import_obsidian3.Notice("\u274C Sync failed. Check console for details.");
       } finally {
         syncButton.textContent = "\u{1F504} Sync Now";
         syncButton.disabled = false;
@@ -853,7 +1279,8 @@ var ProactivityView = class extends import_obsidian2.ItemView {
     console.log("Starting body doubling");
   }
   startBreathingExercise() {
-    const modal = new BreathingModal(this.app);
+    const energyLevel = typeof this.currentEnergyLevel === "string" ? 3 : this.currentEnergyLevel;
+    const modal = new BreathingModal(this.app, this.integrationService, energyLevel);
     modal.open();
   }
   createQuickNote() {
@@ -873,7 +1300,7 @@ var ProactivityView = class extends import_obsidian2.ItemView {
       "You've overcome challenges before! \u{1F3AF}"
     ];
     const motivation = motivations[Math.floor(Math.random() * motivations.length)];
-    new import_obsidian2.Notice(motivation);
+    new import_obsidian3.Notice(motivation);
   }
   triggerProcrastinationHelp() {
     console.log("Triggering procrastination help");
@@ -881,7 +1308,7 @@ var ProactivityView = class extends import_obsidian2.ItemView {
   showTimeAnchor() {
     const now = new Date();
     const timeString = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    new import_obsidian2.Notice(`\u{1F550} Time anchor: It's currently ${timeString}`);
+    new import_obsidian3.Notice(`\u{1F550} Time anchor: It's currently ${timeString}`);
   }
   overwhelmReset() {
     console.log("Overwhelm reset triggered");
@@ -893,9 +1320,11 @@ var ProactivityView = class extends import_obsidian2.ItemView {
     this.todaysTasks = await this.integrationService.getTodaysTasks();
   }
 };
-var BreathingModal = class extends import_obsidian2.Modal {
-  constructor(app) {
+var BreathingModal = class extends import_obsidian3.Modal {
+  constructor(app, integrationService, currentEnergyLevel = 3) {
     super(app);
+    this.integrationService = integrationService;
+    this.currentEnergyLevel = currentEnergyLevel;
   }
   onOpen() {
     const { contentEl } = this;
@@ -951,407 +1380,168 @@ var BreathingModal = class extends import_obsidian2.Modal {
     };
     setTimeout(runCycle, 1e3);
   }
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
-};
-
-// src/task-breakdown-modal.ts
-var import_obsidian3 = require("obsidian");
-var TaskBreakdownModal = class extends import_obsidian3.Modal {
-  constructor(app, settings, integrationService, sourceFile) {
-    super(app);
-    this.selectedText = "";
-    this.isProcessing = false;
-    this.settings = settings;
-    this.integrationService = integrationService;
-    this.apiClient = new ProactivityApiClient(settings);
-    this.sourceFile = sourceFile || null;
-  }
-  async onOpen() {
-    var _a;
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass("proactive-task-breakdown-modal");
-    this.selectedText = await this.integrationService.getSelectedText() || "";
-    this.createHeader();
-    this.createTaskInputSection();
-    this.createContextSection();
-    this.createOptionsSection();
-    this.createActionButtons();
-    this.createBreakdownDisplay();
-    if (this.selectedText) {
-      this.taskInput.value = `Work on: "${this.selectedText.substring(0, 100)}..."`;
-      this.contextInput.value = `Selected text from ${((_a = this.sourceFile) == null ? void 0 : _a.name) || "current file"}`;
-    } else if (this.sourceFile) {
-      this.taskInput.value = `Continue work on ${this.sourceFile.name}`;
-      this.contextInput.value = `Working on file: ${this.sourceFile.path}`;
-    }
-  }
-  createHeader() {
-    const { contentEl } = this;
-    const header = contentEl.createEl("div", { cls: "modal-header" });
-    header.createEl("h2", { text: "\u{1F528} AI Task Breakdown" });
-    header.createEl("p", {
-      text: "Break down overwhelming tasks into ADHD-friendly micro-steps",
-      cls: "modal-subtitle"
-    });
-  }
-  createTaskInputSection() {
-    const { contentEl } = this;
-    const section = contentEl.createEl("div", { cls: "input-section" });
-    section.createEl("label", { text: "What do you want to work on?" });
-    this.taskInput = section.createEl("input", {
-      type: "text",
-      placeholder: 'e.g., "Write the methodology section" or "Analyze survey data"',
-      cls: "task-input"
-    });
-    const suggestions = section.createEl("div", { cls: "quick-suggestions" });
-    suggestions.createEl("span", { text: "Quick suggestions: " });
-    const suggestionItems = [
-      "Write one paragraph",
-      "Review one paper",
-      "Organize notes",
-      "Plan next section"
-    ];
-    suggestionItems.forEach((suggestion) => {
-      const button = suggestions.createEl("button", {
-        text: suggestion,
-        cls: "suggestion-btn"
+  openAIProjectPlanningModal() {
+    const modal = new import_obsidian3.Modal(this.app);
+    modal.onOpen = () => {
+      const { contentEl } = modal;
+      contentEl.empty();
+      contentEl.addClass("ai-planning-modal");
+      const style = contentEl.createEl("style");
+      style.textContent = `
+          .ai-planning-modal {
+            max-width: 700px !important;
+            max-height: 80vh !important;
+          }
+          .planning-header {
+            text-align: center;
+            margin-bottom: 24px;
+          }
+          .planning-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 16px;
+            border: 2px solid var(--background-modifier-border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 16px;
+          }
+          .planning-input:focus {
+            border-color: var(--interactive-accent);
+            box-shadow: 0 0 0 3px rgba(var(--interactive-accent-rgb), 0.1);
+          }
+          .planning-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+          }
+          .planning-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .planning-btn.primary {
+            background: var(--interactive-accent);
+            color: white;
+          }
+          .planning-btn.primary:hover {
+            background: var(--interactive-accent-hover);
+          }
+          .planning-btn.secondary {
+            background: var(--background-secondary);
+            color: var(--text-normal);
+          }
+          .planning-btn.secondary:hover {
+            background: var(--background-modifier-hover);
+          }
+          .planning-output {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--background-secondary);
+            border-radius: 8px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+          }
+        `;
+      const header = contentEl.createEl("div", { cls: "planning-header" });
+      header.createEl("h2", { text: "\u{1F916} AI Project Planning Assistant" });
+      header.createEl("p", { text: "Describe your project or goal and I'll help you break it down into actionable steps." });
+      const inputArea = contentEl.createEl("textarea", {
+        cls: "planning-input",
+        placeholder: 'Describe your project in natural language...\n\nFor example:\n\u2022 "I need to write my dissertation chapter on machine learning"\n\u2022 "I want to build a mobile app for tracking habits"\n\u2022 "I need to organize a team retreat for 20 people"'
       });
-      button.onclick = () => {
-        this.taskInput.value = suggestion;
+      const buttonsDiv = contentEl.createEl("div", { cls: "planning-buttons" });
+      const planButton = buttonsDiv.createEl("button", { cls: "planning-btn primary", text: "\u{1F680} Create Project Plan" });
+      const cancelButton = buttonsDiv.createEl("button", { cls: "planning-btn secondary", text: "Cancel" });
+      let outputDiv;
+      const self = this;
+      planButton.onclick = async () => {
+        var _a;
+        const projectDescription = inputArea.value.trim();
+        if (!projectDescription) {
+          new import_obsidian3.Notice("Please describe your project first");
+          inputArea.focus();
+          return;
+        }
+        planButton.textContent = "\u{1F916} AI is planning...";
+        planButton.disabled = true;
+        try {
+          const planResult = await self.integrationService.generateProjectPlan(
+            projectDescription,
+            self.currentEnergyLevel
+          );
+          if (!outputDiv) {
+            outputDiv = contentEl.createEl("div", { cls: "planning-output" });
+          }
+          outputDiv.innerHTML = `
+              <h3>\u{1F4CB} Generated Project Plan</h3>
+              <p><strong>Project:</strong> ${planResult.title || projectDescription}</p>
+              ${planResult.motivation ? `<p><strong>Motivation:</strong> ${planResult.motivation}</p>` : ""}
+
+              <h4>\u{1F3AF} Action Steps:</h4>
+              <ol>
+                ${planResult.steps.map((step) => `
+                  <li>
+                    <strong>${step.title}</strong>
+                    <em>(${step.estimatedMinutes} min)</em>
+                    ${step.description ? `<br><small>${step.description}</small>` : ""}
+                  </li>
+                `).join("")}
+              </ol>
+
+              <div style="margin-top: 16px;">
+                <button class="planning-btn primary" id="add-all-steps">\u{1F4CB} Add All Steps to Vault</button>
+              </div>
+            `;
+          (_a = outputDiv.querySelector("#add-all-steps")) == null ? void 0 : _a.addEventListener("click", async () => {
+            try {
+              for (const step of planResult.steps) {
+                await self.integrationService.addTaskToVault(
+                  `${step.title} (${step.estimatedMinutes}min)`,
+                  step.priority || "medium"
+                );
+              }
+              new import_obsidian3.Notice(`Added ${planResult.steps.length} tasks to your vault!`);
+              modal.close();
+            } catch (error) {
+              console.error("Failed to add tasks to vault:", error);
+              new import_obsidian3.Notice("Failed to add tasks to vault");
+            }
+          });
+        } catch (error) {
+          console.error("AI planning failed:", error);
+          new import_obsidian3.Notice("AI planning failed. Please check your API key in settings.");
+          if (!outputDiv) {
+            outputDiv = contentEl.createEl("div", { cls: "planning-output" });
+          }
+          outputDiv.textContent = "\u274C AI planning failed. Please check your OpenAI API key in plugin settings and try again.";
+        } finally {
+          planButton.textContent = "\u{1F680} Create Project Plan";
+          planButton.disabled = false;
+        }
       };
-    });
-  }
-  createContextSection() {
-    const { contentEl } = this;
-    const section = contentEl.createEl("div", { cls: "input-section" });
-    section.createEl("label", { text: "Additional context (optional)" });
-    this.contextInput = section.createEl("textarea", {
-      placeholder: "Any relevant details, constraints, or background information...",
-      cls: "context-input"
-    });
-  }
-  createOptionsSection() {
-    const { contentEl } = this;
-    const section = contentEl.createEl("div", { cls: "options-section" });
-    const depthContainer = section.createEl("div", { cls: "option-container" });
-    depthContainer.createEl("label", { text: "Breakdown detail level" });
-    this.depthSlider = depthContainer.createEl("input", {
-      type: "range",
-      cls: "depth-slider"
-    });
-    this.depthSlider.min = "1";
-    this.depthSlider.max = "5";
-    this.depthSlider.value = this.settings.defaultBreakdownDepth.toString();
-    const depthLabel = depthContainer.createEl("span", {
-      text: this.getDepthLabel(this.settings.defaultBreakdownDepth),
-      cls: "depth-label"
-    });
-    this.depthSlider.oninput = () => {
-      const depth = parseInt(this.depthSlider.value);
-      depthLabel.textContent = this.getDepthLabel(depth);
+      cancelButton.onclick = () => modal.close();
+      setTimeout(() => inputArea.focus(), 100);
     };
-    const energyContainer = section.createEl("div", { cls: "option-container" });
-    energyContainer.createEl("label", { text: "Your current energy level" });
-    this.energySelect = energyContainer.createEl("select", { cls: "energy-select" });
-    const energyOptions = [
-      { value: "high", text: "\u26A1 High - Ready for complex tasks" },
-      { value: "moderate", text: "\u{1F50B} Moderate - Normal capacity" },
-      { value: "low", text: "\u{1FAAB} Low - Simple tasks only" },
-      { value: "depleted", text: "\u{1F634} Depleted - Need rest/micro-tasks" }
-    ];
-    energyOptions.forEach((option) => {
-      const optionEl = this.energySelect.createEl("option", {
-        value: option.value,
-        text: option.text
-      });
-      if (option.value === "moderate") {
-        optionEl.selected = true;
-      }
-    });
-    const timeContainer = section.createEl("div", { cls: "option-container" });
-    timeContainer.createEl("label", { text: "Available time (minutes)" });
-    this.timeInput = timeContainer.createEl("input", {
-      type: "number",
-      cls: "time-input"
-    });
-    this.timeInput.min = "5";
-    this.timeInput.max = "180";
-    this.timeInput.value = "30";
-  }
-  createActionButtons() {
-    const { contentEl } = this;
-    const buttonContainer = contentEl.createEl("div", { cls: "button-container" });
-    const breakdownBtn = buttonContainer.createEl("button", {
-      text: "\u{1F916} Break Down Task",
-      cls: "mod-cta breakdown-btn"
-    });
-    breakdownBtn.onclick = () => this.performBreakdown();
-    const cancelBtn = buttonContainer.createEl("button", {
-      text: "Cancel",
-      cls: "cancel-btn"
-    });
-    cancelBtn.onclick = () => this.close();
-  }
-  createBreakdownDisplay() {
-    const { contentEl } = this;
-    this.breakdownContainer = contentEl.createEl("div", { cls: "breakdown-container" });
-  }
-  getDepthLabel(depth) {
-    const labels = {
-      1: "Basic (2-3 steps)",
-      2: "Simple (3-5 steps)",
-      3: "Detailed (5-8 steps)",
-      4: "Very Detailed (8-12 steps)",
-      5: "Micro-steps (12+ steps)"
+    modal.onClose = () => {
+      const { contentEl } = modal;
+      contentEl.empty();
     };
-    return labels[depth] || "Detailed";
-  }
-  async performBreakdown() {
-    var _a;
-    if (this.isProcessing)
-      return;
-    const task = this.taskInput.value.trim();
-    if (!task) {
-      new import_obsidian3.Notice("Please enter a task to break down");
-      return;
-    }
-    this.isProcessing = true;
-    this.showProcessingState();
-    try {
-      const breakdown = await this.requestTaskBreakdown({
-        task,
-        context: this.contextInput.value.trim(),
-        depth: parseInt(this.depthSlider.value),
-        energyLevel: this.energySelect.value,
-        availableTime: parseInt(this.timeInput.value),
-        sourceFile: (_a = this.sourceFile) == null ? void 0 : _a.path,
-        selectedText: this.selectedText
-      });
-      this.displayBreakdown(breakdown);
-    } catch (error) {
-      console.error("Task breakdown error:", error);
-      this.showError("Failed to break down task. Please try again.");
-    } finally {
-      this.isProcessing = false;
-    }
-  }
-  showProcessingState() {
-    this.breakdownContainer.empty();
-    this.breakdownContainer.addClass("processing");
-    const processing = this.breakdownContainer.createEl("div", { cls: "processing-message" });
-    processing.createEl("div", { cls: "spinner" });
-    processing.createEl("p", { text: "\u{1F916} Breaking down your task into ADHD-friendly steps..." });
-    processing.createEl("p", {
-      text: "This usually takes 10-15 seconds",
-      cls: "processing-subtitle"
-    });
-  }
-  showError(message) {
-    this.breakdownContainer.empty();
-    this.breakdownContainer.removeClass("processing");
-    const error = this.breakdownContainer.createEl("div", { cls: "error-message" });
-    error.createEl("p", { text: "\u274C " + message });
-    const retryBtn = error.createEl("button", {
-      text: "Try Again",
-      cls: "retry-btn"
-    });
-    retryBtn.onclick = () => this.performBreakdown();
-  }
-  displayBreakdown(breakdown) {
-    this.breakdownContainer.empty();
-    this.breakdownContainer.removeClass("processing");
-    if (!breakdown || !breakdown.steps || breakdown.steps.length === 0) {
-      this.showError("No breakdown steps received");
-      return;
-    }
-    const header = this.breakdownContainer.createEl("div", { cls: "breakdown-header" });
-    header.createEl("h3", { text: "\u2728 Your ADHD-Friendly Task Breakdown" });
-    if (breakdown.motivation) {
-      header.createEl("p", {
-        text: breakdown.motivation,
-        cls: "motivation-message"
-      });
-    }
-    const stepsList = this.breakdownContainer.createEl("div", { cls: "steps-list" });
-    breakdown.steps.forEach((step, index) => {
-      const stepEl = stepsList.createEl("div", { cls: "breakdown-step" });
-      const stepHeader = stepEl.createEl("div", { cls: "step-header" });
-      stepHeader.createEl("span", {
-        text: `${index + 1}.`,
-        cls: "step-number"
-      });
-      stepHeader.createEl("h4", {
-        text: step.title,
-        cls: "step-title"
-      });
-      stepHeader.createEl("span", {
-        text: `\u23F1\uFE0F ${step.estimatedMinutes}min`,
-        cls: "step-time"
-      });
-      if (step.description) {
-        stepEl.createEl("p", {
-          text: step.description,
-          cls: "step-description"
-        });
-      }
-      if (step.tips && step.tips.length > 0) {
-        const tipsList = stepEl.createEl("ul", { cls: "step-tips" });
-        step.tips.forEach((tip) => {
-          tipsList.createEl("li", { text: tip });
-        });
-      }
-      const stepActions = stepEl.createEl("div", { cls: "step-actions" });
-      const startBtn = stepActions.createEl("button", {
-        text: "\u25B6\uFE0F Start",
-        cls: "step-start-btn"
-      });
-      startBtn.onclick = () => this.startStep(step);
-      const addToVaultBtn = stepActions.createEl("button", {
-        text: "\u{1F4DD} Add to Daily Note",
-        cls: "step-add-btn"
-      });
-      addToVaultBtn.onclick = () => this.addStepToVault(step);
-    });
-    const footer = this.breakdownContainer.createEl("div", { cls: "breakdown-footer" });
-    const addAllBtn = footer.createEl("button", {
-      text: "\u{1F4CB} Add All Steps to Daily Note",
-      cls: "mod-cta"
-    });
-    addAllBtn.onclick = () => this.addAllStepsToVault(breakdown.steps);
-    const newBreakdownBtn = footer.createEl("button", {
-      text: "\u{1F504} Try Different Breakdown",
-      cls: "secondary-btn"
-    });
-    newBreakdownBtn.onclick = () => {
-      this.breakdownContainer.empty();
-    };
-  }
-  // Use the integrated approach from ObsidianIntegrationService which has both OpenAI direct and fallback
-  async requestTaskBreakdown(params) {
-    return await this.integrationService.breakdownTask(params.task, {
-      energyLevel: params.energyLevel,
-      depth: params.depth,
-      availableTime: params.availableTime,
-      context: params.context || ""
-    });
-  }
-  async startStep(step) {
-    await this.integrationService.startTask({
-      title: step.title,
-      description: step.description,
-      estimatedMinutes: step.estimatedMinutes,
-      complexity: step.complexity
-    });
-    new import_obsidian3.Notice(`Started: ${step.title} (${step.estimatedMinutes}min)`);
-    this.close();
-  }
-  async addStepToVault(step) {
-    const dailyNotePath = await this.getDailyNotePath();
-    if (!dailyNotePath) {
-      new import_obsidian3.Notice("Unable to find daily note");
-      return;
-    }
-    try {
-      const file = await this.getOrCreateFile(dailyNotePath);
-      const content = await this.app.vault.read(file);
-      const taskEntry = `- [ ] ${step.title} (${step.estimatedMinutes}min)${step.description ? ` - ${step.description}` : ""}
-`;
-      const updatedContent = this.updateTasksSection(content, taskEntry);
-      await this.app.vault.modify(file, updatedContent);
-      new import_obsidian3.Notice(`Added "${step.title}" to daily note`);
-    } catch (error) {
-      console.error("Error adding step to vault:", error);
-      new import_obsidian3.Notice("Error adding step to daily note");
-    }
-  }
-  async addAllStepsToVault(steps) {
-    const dailyNotePath = await this.getDailyNotePath();
-    if (!dailyNotePath) {
-      new import_obsidian3.Notice("Unable to find daily note");
-      return;
-    }
-    try {
-      const file = await this.getOrCreateFile(dailyNotePath);
-      const content = await this.app.vault.read(file);
-      const taskEntries = steps.map(
-        (step) => `- [ ] ${step.title} (${step.estimatedMinutes}min)${step.description ? ` - ${step.description}` : ""}`
-      ).join("\n") + "\n";
-      const updatedContent = this.updateTasksSection(content, taskEntries);
-      await this.app.vault.modify(file, updatedContent);
-      new import_obsidian3.Notice(`Added ${steps.length} tasks to daily note`);
-      this.close();
-    } catch (error) {
-      console.error("Error adding steps to vault:", error);
-      new import_obsidian3.Notice("Error adding tasks to daily note");
-    }
-  }
-  async getDailyNotePath() {
-    const today = new Date().toISOString().split("T")[0];
-    const dailyNoteFolder = this.settings.obsidianIntegration.dailyNotePath;
-    return `${dailyNoteFolder}/${today}.md`;
-  }
-  async getOrCreateFile(path) {
-    let file = this.app.vault.getAbstractFileByPath(path);
-    if (!file) {
-      const template = this.createDailyNoteTemplate();
-      file = await this.app.vault.create(path, template);
-    }
-    return file;
-  }
-  createDailyNoteTemplate() {
-    const today = new Date().toLocaleDateString();
-    return `# Daily Note - ${today}
-
-${this.settings.obsidianIntegration.taskTagPrefix}/daily-note
-
-## Energy Tracking
-
-## Current Focus
-
-## Tasks
-
-## Progress
-
-## Celebrations
-
-## Reflections
-
----
-*Generated by Proactivity*`;
-  }
-  updateTasksSection(content, newTasks) {
-    const tasksSection = "## Tasks";
-    const sectionRegex = new RegExp(`(${tasksSection}\\n)[\\s\\S]*?(?=\\n## |\\n---|$)`, "i");
-    if (sectionRegex.test(content)) {
-      return content.replace(sectionRegex, `${tasksSection}
-
-${newTasks}`);
-    } else {
-      const dividerIndex = content.lastIndexOf("\n---");
-      if (dividerIndex !== -1) {
-        return content.slice(0, dividerIndex) + `
-${tasksSection}
-
-${newTasks}
-` + content.slice(dividerIndex);
-      } else {
-        return content + `
-
-${tasksSection}
-
-${newTasks}`;
-      }
-    }
+    modal.open();
   }
   onClose() {
     const { contentEl } = this;
     contentEl.empty();
   }
 };
+
+// src/main.ts
+init_task_breakdown_modal();
 
 // src/adhd-pattern-detector.ts
 var import_obsidian4 = require("obsidian");
@@ -1684,6 +1874,7 @@ var ADHDPatternDetector = class {
 
 // src/obsidian-integration-service.ts
 var import_obsidian5 = require("obsidian");
+init_api_client();
 var ObsidianIntegrationService = class {
   constructor(app, settings) {
     this.dailyNotificationCount = 0;
@@ -2464,6 +2655,478 @@ ${newTaskLine}`;
       return [];
     }
   }
+  async generateProjectPlan(projectDescription, energyLevel) {
+    try {
+      if (this.settings.apiKey) {
+        return this.generateProjectPlanWithOpenAI(projectDescription, energyLevel);
+      } else {
+        return this.generateBasicProjectPlan(projectDescription);
+      }
+    } catch (error) {
+      console.error("Failed to generate project plan:", error);
+      return this.generateBasicProjectPlan(projectDescription);
+    }
+  }
+  async generateProjectPlanWithOpenAI(projectDescription, energyLevel = "moderate") {
+    const systemPrompt = `You are an ADHD-friendly project planning assistant. Help break down projects into manageable, concrete steps.
+
+Energy Level: ${energyLevel}
+
+Guidelines:
+- For high energy: Include 5-8 steps, allow complex tasks
+- For moderate energy: Include 3-5 steps, balance complexity
+- For low energy: Include 2-4 steps, focus on simple actions
+- For depleted energy: Include 1-3 micro-steps
+
+Each step should:
+- Have a clear, actionable title
+- Include realistic time estimate (5-120 minutes)
+- Be specific and concrete
+- Build logically toward the project goal
+
+Respond ONLY with JSON in this exact format:
+{
+  "title": "Clear project title",
+  "motivation": "Brief encouraging note about why this matters",
+  "steps": [
+    {
+      "title": "Specific actionable step",
+      "description": "Brief clarification if needed",
+      "estimatedMinutes": 30,
+      "priority": "high|medium|low"
+    }
+  ]
+}`;
+    const userPrompt = `Project to plan: ${projectDescription}`;
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.settings.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          max_tokens: 1e3,
+          temperature: 0.7
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+      const data = await response.json();
+      const content = data.choices[0].message.content.trim();
+      const parsed = JSON.parse(content);
+      return {
+        title: parsed.title,
+        motivation: parsed.motivation,
+        steps: parsed.steps || []
+      };
+    } catch (error) {
+      console.error("OpenAI project planning failed:", error);
+      throw error;
+    }
+  }
+  generateBasicProjectPlan(projectDescription) {
+    const steps = [
+      {
+        title: "Research and gather information",
+        description: "Collect relevant resources and understand requirements",
+        estimatedMinutes: 30,
+        priority: "high"
+      },
+      {
+        title: "Create initial outline or plan",
+        description: "Structure your approach to the project",
+        estimatedMinutes: 20,
+        priority: "high"
+      },
+      {
+        title: "Start with the first concrete step",
+        description: "Begin working on the most important component",
+        estimatedMinutes: 45,
+        priority: "high"
+      },
+      {
+        title: "Review progress and adjust",
+        description: "Check what's working and what needs refinement",
+        estimatedMinutes: 15,
+        priority: "medium"
+      }
+    ];
+    return {
+      title: `Project: ${projectDescription.slice(0, 60)}${projectDescription.length > 60 ? "..." : ""}`,
+      motivation: "You've got this! Breaking it down into steps makes any project more manageable. \u{1F4AA}",
+      steps
+    };
+  }
+};
+
+// src/obsidian-sync-service.ts
+var import_obsidian6 = require("obsidian");
+init_api_client();
+var ObsidianSyncService = class {
+  constructor(settings) {
+    this.syncInterval = null;
+    this.lastSyncTimestamp = 0;
+    this.syncQueue = [];
+    this.isOnline = true;
+    this.settings = settings;
+    this.apiClient = new ProactivityApiClient(settings);
+    this.setupPeriodicSync();
+    this.setupOnlineStatusMonitoring();
+  }
+  updateSettings(settings) {
+    this.settings = settings;
+    this.apiClient.updateSettings(settings);
+    this.restartPeriodicSync();
+  }
+  /**
+   * Perform full bidirectional sync
+   */
+  async performFullSync() {
+    if (!this.settings.browserExtensionSync.enableSync) {
+      return { success: false, syncedItems: 0, conflicts: [] };
+    }
+    try {
+      const syncResult = {
+        success: true,
+        syncedItems: 0,
+        conflicts: []
+      };
+      if (this.syncQueue.length > 0) {
+        const pushResult = await this.pushLocalChanges();
+        syncResult.syncedItems += pushResult.synced;
+        syncResult.conflicts.push(...pushResult.conflicts);
+      }
+      const pullResult = await this.pullRemoteChanges();
+      syncResult.syncedItems += pullResult.synced;
+      syncResult.conflicts.push(...pullResult.conflicts);
+      if (this.settings.browserExtensionSync.syncTasks) {
+        const extensionSyncResult = await this.syncWithBrowserExtension();
+        syncResult.syncedItems += extensionSyncResult.synced;
+        syncResult.conflicts.push(...extensionSyncResult.conflicts);
+      }
+      this.lastSyncTimestamp = Date.now();
+      this.settings.browserExtensionSync.lastSyncTimestamp = this.lastSyncTimestamp;
+      if (syncResult.conflicts.length > 0) {
+        new import_obsidian6.Notice(`Sync completed with ${syncResult.conflicts.length} conflicts to resolve`);
+      } else {
+        console.log(`Sync completed: ${syncResult.syncedItems} items synced`);
+      }
+      return syncResult;
+    } catch (error) {
+      console.error("Sync failed:", error);
+      new import_obsidian6.Notice("Sync failed - will retry automatically");
+      return { success: false, syncedItems: 0, conflicts: [] };
+    }
+  }
+  /**
+   * Add item to sync queue for next sync
+   */
+  queueForSync(item) {
+    this.syncQueue.push({
+      ...item,
+      id: `queue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      retries: 0
+    });
+    if (this.syncQueue.length >= 10 || item.type === "task" && item.action === "create") {
+      this.performFullSync();
+    }
+  }
+  /**
+   * Push local changes to backend server
+   */
+  async pushLocalChanges() {
+    const result = { synced: 0, conflicts: [] };
+    const itemsToSync = [...this.syncQueue];
+    for (const item of itemsToSync) {
+      try {
+        const endpoint = this.getEndpointForItem(item);
+        const method = item.action === "delete" ? "DELETE" : "POST";
+        const response = await fetch(`${this.settings.serverUrl}${endpoint}`, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": this.settings.apiKey || ""
+          },
+          body: JSON.stringify({
+            ...item.data,
+            source: "obsidian-plugin",
+            timestamp: item.timestamp
+          })
+        });
+        if (response.ok) {
+          this.syncQueue = this.syncQueue.filter((queuedItem) => queuedItem.id !== item.id);
+          result.synced++;
+        } else if (response.status === 409) {
+          const conflictData = await response.json();
+          result.conflicts.push({
+            type: "push_conflict",
+            item,
+            serverData: conflictData,
+            resolution: "manual"
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to sync item ${item.id}:`, error);
+        item.retries++;
+        if (item.retries >= 3) {
+          this.syncQueue = this.syncQueue.filter((queuedItem) => queuedItem.id !== item.id);
+          console.warn(`Dropped item after 3 failed sync attempts:`, item);
+        }
+      }
+    }
+    return result;
+  }
+  /**
+   * Pull remote changes from backend server
+   */
+  async pullRemoteChanges() {
+    const result = { synced: 0, conflicts: [] };
+    try {
+      const response = await fetch(`${this.settings.serverUrl}/api/sync/changes?since=${this.lastSyncTimestamp}&source=exclude-obsidian`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.settings.apiKey || ""
+        }
+      });
+      if (!response.ok)
+        return result;
+      const { changes } = await response.json();
+      for (const change of changes) {
+        try {
+          const applied = await this.applyRemoteChange(change);
+          if (applied.success) {
+            result.synced++;
+          } else if (applied.conflict) {
+            result.conflicts.push(applied.conflict);
+          }
+        } catch (error) {
+          console.error("Failed to apply remote change:", error);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to pull remote changes:", error);
+    }
+    return result;
+  }
+  /**
+   * Sync directly with browser extension using shared backend
+   */
+  async syncWithBrowserExtension() {
+    const result = { synced: 0, conflicts: [] };
+    try {
+      const response = await fetch(`${this.settings.serverUrl}/api/sync/extension-status`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.settings.apiKey || ""
+        }
+      });
+      if (!response.ok)
+        return result;
+      const { lastActivity, hasChanges } = await response.json();
+      if (hasChanges && lastActivity > this.lastSyncTimestamp) {
+        const changesResponse = await fetch(`${this.settings.serverUrl}/api/sync/extension-changes?since=${this.lastSyncTimestamp}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": this.settings.apiKey || ""
+          }
+        });
+        if (changesResponse.ok) {
+          const { changes } = await changesResponse.json();
+          for (const change of changes) {
+            const applied = await this.applyRemoteChange(change);
+            if (applied.success) {
+              result.synced++;
+            } else if (applied.conflict) {
+              result.conflicts.push(applied.conflict);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Browser extension sync failed:", error);
+    }
+    return result;
+  }
+  /**
+   * Apply a remote change to local Obsidian data
+   */
+  async applyRemoteChange(change) {
+    try {
+      switch (change.type) {
+        case "task":
+          return await this.applyTaskChange(change);
+        case "energy_level":
+          return await this.applyEnergyLevelChange(change);
+        case "focus_session":
+          return await this.applyFocusSessionChange(change);
+        case "enforcement_settings":
+          return await this.applyEnforcementSettingsChange(change);
+        default:
+          console.warn("Unknown change type:", change.type);
+          return { success: false };
+      }
+    } catch (error) {
+      console.error("Error applying remote change:", error);
+      return { success: false };
+    }
+  }
+  /**
+   * Apply task changes to Obsidian vault
+   */
+  async applyTaskChange(change) {
+    console.log("Applying task change:", change);
+    const existingTask = await this.findLocalTask(change.data.id);
+    if (existingTask && existingTask.timestamp > change.timestamp) {
+      return {
+        success: false,
+        conflict: {
+          type: "task_conflict",
+          local: existingTask,
+          remote: change.data,
+          resolution: "latest_wins"
+        }
+      };
+    }
+    return { success: true };
+  }
+  /**
+   * Apply energy level changes
+   */
+  async applyEnergyLevelChange(change) {
+    console.log("Applying energy level change:", change);
+    return { success: true };
+  }
+  /**
+   * Apply focus session changes
+   */
+  async applyFocusSessionChange(change) {
+    console.log("Applying focus session change:", change);
+    return { success: true };
+  }
+  /**
+   * Apply enforcement settings changes
+   */
+  async applyEnforcementSettingsChange(change) {
+    if (this.settings.browserExtensionSync.syncEnforcementSettings) {
+      console.log("Applying enforcement settings change:", change);
+      return { success: true };
+    }
+    return { success: false };
+  }
+  /**
+   * Find local task by ID
+   */
+  async findLocalTask(taskId) {
+    return null;
+  }
+  /**
+   * Get appropriate API endpoint for sync item
+   */
+  getEndpointForItem(item) {
+    switch (item.type) {
+      case "task":
+        return item.action === "delete" ? `/api/tasks/${item.data.id}` : "/api/tasks";
+      case "energy_level":
+        return "/api/user/energy-level";
+      case "focus_session":
+        return "/api/focus/sessions";
+      case "enforcement_settings":
+        return "/api/user/enforcement-settings";
+      default:
+        return "/api/sync/generic";
+    }
+  }
+  /**
+   * Setup periodic background sync
+   */
+  setupPeriodicSync() {
+    if (!this.settings.browserExtensionSync.enableSync)
+      return;
+    const intervalMs = this.settings.browserExtensionSync.syncInterval * 60 * 1e3;
+    this.syncInterval = setInterval(async () => {
+      if (this.isOnline && this.syncQueue.length > 0) {
+        await this.performFullSync();
+      }
+    }, intervalMs);
+  }
+  /**
+   * Restart periodic sync with new settings
+   */
+  restartPeriodicSync() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+    }
+    this.setupPeriodicSync();
+  }
+  /**
+   * Monitor online status for sync scheduling
+   */
+  setupOnlineStatusMonitoring() {
+    setInterval(() => {
+      this.checkOnlineStatus();
+    }, 3e4);
+  }
+  /**
+   * Check if we're online and can sync
+   */
+  async checkOnlineStatus() {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5e3);
+      const response = await fetch(`${this.settings.serverUrl}/api/health`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      this.isOnline = response.ok;
+    } catch (e) {
+      this.isOnline = false;
+    }
+  }
+  /**
+   * Manual sync trigger for user-initiated syncs
+   */
+  async triggerManualSync() {
+    new import_obsidian6.Notice("Starting manual sync...");
+    const result = await this.performFullSync();
+    if (result.success) {
+      new import_obsidian6.Notice(`Sync completed: ${result.syncedItems} items synced`);
+    } else {
+      new import_obsidian6.Notice("Sync failed - check your connection");
+    }
+  }
+  /**
+   * Get sync status for UI display
+   */
+  getSyncStatus() {
+    return {
+      isOnline: this.isOnline,
+      lastSync: this.lastSyncTimestamp,
+      queuedItems: this.syncQueue.length,
+      syncEnabled: this.settings.browserExtensionSync.enableSync
+    };
+  }
+  /**
+   * Clean up resources
+   */
+  destroy() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+    }
+  }
 };
 
 // src/main.ts
@@ -2511,11 +3174,12 @@ var DEFAULT_SETTINGS = {
     timeBlindnessSupport: true
   }
 };
-var ProactivityPlugin = class extends import_obsidian6.Plugin {
+var ProactivityPlugin = class extends import_obsidian7.Plugin {
   async onload() {
     try {
       await this.loadSettings();
       this.integrationService = new ObsidianIntegrationService(this.app, this.settings);
+      this.syncService = new ObsidianSyncService(this.settings);
       this.patternDetector = new ADHDPatternDetector(this.app, this.settings);
       this.statusBarItem = this.addStatusBarItem();
       this.updateStatusBar("Initializing...");
@@ -2524,8 +3188,12 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
         VIEW_TYPE_PROACTIVITY,
         (leaf) => new ProactivityView(leaf, this.settings, this.integrationService)
       );
-      this.addRibbonIcon("brain", "Proactivity", () => {
+      this.addRibbonIcon("brain", "Proactivity Dashboard", () => {
         this.activateView();
+      });
+      this.addRibbonIcon("bot", "AI Task Breakdown Assistant", () => {
+        const activeFile = this.app.workspace.getActiveFile();
+        this.openTaskBreakdownModal(activeFile);
       });
       this.updateStatusBar("Ready");
       this.registerCommands();
@@ -2535,11 +3203,12 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
       if (this.settings.enableProactiveNotifications) {
         this.startProactiveNotifications();
       }
+      this.startStatusBarUpdates();
       if (this.settings.browserExtensionSync.enableSync) {
         this.startBrowserExtensionSync();
       }
       this.addSettingTab(new ProactivitySettingTab(this.app, this));
-      new import_obsidian6.Notice("Proactivity: Your ADHD-friendly dissertation assistant is ready!");
+      new import_obsidian7.Notice("Proactivity: Your ADHD-friendly dissertation assistant is ready!");
       window.Proactivity = {
         ctx: () => this.integrationService.getCurrentContext(),
         suggestions: (lvl) => this.integrationService.getTaskSuggestions(lvl || "moderate"),
@@ -2549,7 +3218,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
       };
     } catch (error) {
       console.error("Proactivity Plugin: Failed to initialize:", error);
-      new import_obsidian6.Notice("\u274C Proactivity Plugin failed to load. Check console for details.", 8e3);
+      new import_obsidian7.Notice("\u274C Proactivity Plugin failed to load. Check console for details.", 8e3);
       this.statusBarItem = this.addStatusBarItem();
       this.updateStatusBar("Error - check console");
     }
@@ -2559,14 +3228,14 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
       const response = await fetch(`${this.settings.serverUrl}/health`);
       if (response.ok) {
         const health = await response.json();
-        new import_obsidian6.Notice(`\u2705 Connected to Proactivity backend (v${health.version || "1.0.0"})`, 3e3);
+        new import_obsidian7.Notice(`\u2705 Connected to Proactivity backend (v${health.version || "1.0.0"})`, 3e3);
         this.updateStatusBar("Connected");
       } else {
         throw new Error("Backend health check failed");
       }
     } catch (error) {
       console.warn("Backend connection failed:", error);
-      new import_obsidian6.Notice("\u26A0\uFE0F Backend offline - using local mode. Task breakdown will use fallback.", 6e3);
+      new import_obsidian7.Notice("\u26A0\uFE0F Backend offline - using local mode. Task breakdown will use fallback.", 6e3);
       this.updateStatusBar("Offline mode");
     }
   }
@@ -2643,7 +3312,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
     const dailyNotePath = `${this.settings.obsidianIntegration.dailyNotePath}/${today}.md`;
     try {
       const dailyNote = this.app.vault.getAbstractFileByPath(dailyNotePath);
-      if (dailyNote instanceof import_obsidian6.TFile) {
+      if (dailyNote instanceof import_obsidian7.TFile) {
         const content = await this.app.vault.read(dailyNote);
         const energyMatch = content.match(/energy:\s*(\d+)/i);
         if (energyMatch) {
@@ -2679,7 +3348,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
     return score;
   }
   onunload() {
-    var _a;
+    var _a, _b;
     if (this.notificationInterval) {
       clearInterval(this.notificationInterval);
     }
@@ -2687,17 +3356,28 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
       clearInterval(this.syncInterval);
     }
     (_a = this.patternDetector) == null ? void 0 : _a.stopDetection();
+    (_b = this.syncService) == null ? void 0 : _b.destroy();
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
   async saveSettings() {
-    var _a, _b;
+    var _a, _b, _c;
     await this.saveData(this.settings);
     (_a = this.integrationService) == null ? void 0 : _a.updateSettings(this.settings);
-    (_b = this.patternDetector) == null ? void 0 : _b.updateSettings(this.settings);
+    (_b = this.syncService) == null ? void 0 : _b.updateSettings(this.settings);
+    (_c = this.patternDetector) == null ? void 0 : _c.updateSettings(this.settings);
   }
   registerCommands() {
+    this.addCommand({
+      id: "ai-task-breakdown",
+      name: "\u{1F916} AI Task Breakdown Assistant",
+      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "a" }],
+      callback: () => {
+        const activeFile = this.app.workspace.getActiveFile();
+        this.openTaskBreakdownModal(activeFile);
+      }
+    });
     this.addCommand({
       id: "breakdown-current-task",
       name: "Break down current task",
@@ -2706,7 +3386,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
         if (activeFile) {
           this.openTaskBreakdownModal(activeFile);
         } else {
-          new import_obsidian6.Notice("Please open a file or select text to break down");
+          new import_obsidian7.Notice("Please open a file or select text to break down");
         }
       }
     });
@@ -2739,43 +3419,50 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
       }
     });
     this.addCommand({
+      id: "sync-with-extension",
+      name: "\u{1F504} Sync with Browser Extension",
+      callback: () => {
+        this.syncService.triggerManualSync();
+      }
+    });
+    this.addCommand({
       id: "vacation-mode",
       name: "Start vacation mode",
       callback: () => {
-        new import_obsidian6.Notice("Vacation mode activated. Enjoy your break! \u{1F3D6}\uFE0F");
+        new import_obsidian7.Notice("Vacation mode activated. Enjoy your break! \u{1F3D6}\uFE0F");
       }
     });
     this.addCommand({
       id: "deep-focus-mode",
       name: "Start deep focus mode",
       callback: () => {
-        new import_obsidian6.Notice("Deep focus mode activated. \u{1F3AF}");
+        new import_obsidian7.Notice("Deep focus mode activated. \u{1F3AF}");
       }
     });
     this.addCommand({
       id: "end-out-of-office",
       name: "End out of office mode",
       callback: () => {
-        new import_obsidian6.Notice("Welcome back! All features restored. \u2728");
+        new import_obsidian7.Notice("Welcome back! All features restored. \u2728");
       }
     });
     this.addCommand({
       id: "goblin-mode-breakdown",
       name: "Goblin Mode: Break down tasks in current file",
       callback: async () => {
-        const view = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView);
+        const view = this.app.workspace.getActiveViewOfType(import_obsidian7.MarkdownView);
         if (!view) {
-          new import_obsidian6.Notice("Open a markdown file");
+          new import_obsidian7.Notice("Open a markdown file");
           return;
         }
         const editor = view.editor;
         const selection = editor.getSelection() || editor.getValue();
         const tasks = this.integrationService.parseTasksFromText(selection);
         if (!tasks.length) {
-          new import_obsidian6.Notice("No markdown tasks found (- [ ] )");
+          new import_obsidian7.Notice("No markdown tasks found (- [ ] )");
           return;
         }
-        class GoblinModeModal extends import_obsidian6.Modal {
+        class GoblinModeModal extends import_obsidian7.Modal {
           // Track breakdown depth per task
           constructor(app, plugin, tasksParsed) {
             super(app);
@@ -2945,14 +3632,14 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
               saveBtn.onclick = () => {
                 const val = input.value.trim();
                 if (!val) {
-                  new import_obsidian6.Notice("Please provide some context for better AI breakdowns");
+                  new import_obsidian7.Notice("Please provide some context for better AI breakdowns");
                   return;
                 }
                 answers[t.title] = answers[t.title] || [];
                 answers[t.title].push(val);
                 qbox.createEl("p", { text: "\u2713 Context saved: " + val, cls: "tiny muted" });
                 input.value = "";
-                new import_obsidian6.Notice("Context saved! This will improve your next breakdown.");
+                new import_obsidian7.Notice("Context saved! This will improve your next breakdown.");
               };
               const closeBtn = buttonsEl.createEl("button", { text: "Close", cls: "secondary-btn" });
               closeBtn.onclick = () => qbox.remove();
@@ -2972,7 +3659,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
               saveBtn.onclick = () => {
                 const val = input.value.trim();
                 if (!val) {
-                  new import_obsidian6.Notice("Please provide some context");
+                  new import_obsidian7.Notice("Please provide some context");
                   return;
                 }
                 answers[t.title] = answers[t.title] || [];
@@ -3007,7 +3694,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
               this.renderSteps(row, result, t.title);
             } catch (err) {
               console.error("Breakdown error", err);
-              new import_obsidian6.Notice("AI breakdown failed - check your OpenAI API key in settings");
+              new import_obsidian7.Notice("AI breakdown failed - check your OpenAI API key in settings");
             } finally {
               spinner.remove();
             }
@@ -3055,39 +3742,39 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
               });
             } catch (err) {
               console.error("Sub-breakdown error", err);
-              new import_obsidian6.Notice("Failed to break down step further");
+              new import_obsidian7.Notice("Failed to break down step further");
             } finally {
               spinner.remove();
             }
           }
           addStepToFile(step) {
-            const view2 = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView);
+            const view2 = this.app.workspace.getActiveViewOfType(import_obsidian7.MarkdownView);
             if (view2) {
               const editor2 = view2.editor;
               const insertion = `    - [ ] ${step.title} (${step.estimatedMinutes}min)`;
               editor2.replaceSelection(editor2.getSelection() + "\n" + insertion + "\n");
-              new import_obsidian6.Notice("Step added to file");
+              new import_obsidian7.Notice("Step added to file");
             }
           }
           addAllStepsForTask(steps) {
-            const view2 = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView);
+            const view2 = this.app.workspace.getActiveViewOfType(import_obsidian7.MarkdownView);
             if (view2) {
               const editor2 = view2.editor;
               const insertion = steps.map((s) => `    - [ ] ${s.title} (${s.estimatedMinutes}min)`).join("\n");
               editor2.replaceSelection(editor2.getSelection() + "\n" + insertion + "\n");
-              new import_obsidian6.Notice("All steps added for task");
+              new import_obsidian7.Notice("All steps added for task");
             }
           }
           async addAllGeneratedSteps() {
-            const view2 = this.app.workspace.getActiveViewOfType(import_obsidian6.MarkdownView);
+            const view2 = this.app.workspace.getActiveViewOfType(import_obsidian7.MarkdownView);
             if (!view2) {
-              new import_obsidian6.Notice("Open a markdown file to insert into");
+              new import_obsidian7.Notice("Open a markdown file to insert into");
               return;
             }
             const editor2 = view2.editor;
             const allSteps = this.contentEl.querySelectorAll(".goblin-step-text");
             if (allSteps.length === 0) {
-              new import_obsidian6.Notice("No steps generated yet - try breaking down some tasks first");
+              new import_obsidian7.Notice("No steps generated yet - try breaking down some tasks first");
               return;
             }
             let insertion = "";
@@ -3098,7 +3785,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
               }
             });
             editor2.replaceSelection(editor2.getSelection() + insertion + "\n");
-            new import_obsidian6.Notice(`Added ${allSteps.length} generated steps to file`);
+            new import_obsidian7.Notice(`Added ${allSteps.length} generated steps to file`);
           }
           onClose() {
             const { contentEl } = this;
@@ -3134,7 +3821,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
     modal.open();
   }
   showEnergyCheckModal() {
-    const modal = new class extends import_obsidian6.Modal {
+    const modal = new class extends import_obsidian7.Modal {
       constructor(app, plugin) {
         super(app);
         this.plugin = plugin;
@@ -3177,24 +3864,24 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
     await this.integrationService.updateEnergyLevel(energyLevel);
     const suggestions = await this.integrationService.getTaskSuggestions(energyLevel);
     if (suggestions && suggestions.length > 0) {
-      new import_obsidian6.Notice(`Based on your ${energyLevel} energy, I suggest: ${suggestions[0].title}`);
+      new import_obsidian7.Notice(`Based on your ${energyLevel} energy, I suggest: ${suggestions[0].title}`);
     }
   }
   startFocusSession() {
     const sessionLength = 25;
-    new import_obsidian6.Notice(`Starting ${sessionLength}-minute focus session. I'll check in periodically.`);
+    new import_obsidian7.Notice(`Starting ${sessionLength}-minute focus session. I'll check in periodically.`);
     this.updateStatusBar("\u{1F3AF} Focusing");
     const checkInInterval = setInterval(() => {
       this.patternDetector.checkFocusState();
     }, 10 * 60 * 1e3);
     setTimeout(() => {
       clearInterval(checkInInterval);
-      new import_obsidian6.Notice("Focus session complete! Great job. Time for a break?");
+      new import_obsidian7.Notice("Focus session complete! Great job. Time for a break?");
       this.updateStatusBar("\u2705 Session done");
     }, sessionLength * 60 * 1e3);
   }
   async triggerProcrastinationIntervention() {
-    new import_obsidian6.Notice("I'm here to help! Let's break through this together.");
+    new import_obsidian7.Notice("I'm here to help! Let's break through this together.");
     const activeFile = this.app.workspace.getActiveFile();
     const selectedText = await this.integrationService.getSelectedText();
     this.openTaskBreakdownModal(activeFile);
@@ -3209,7 +3896,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
       "\u{1F4AA} Your ADHD brain is powerful!"
     ];
     const celebration = celebrations[Math.floor(Math.random() * celebrations.length)];
-    new import_obsidian6.Notice(celebration);
+    new import_obsidian7.Notice(celebration);
     this.integrationService.logProgressCelebration();
   }
   startProactiveNotifications() {
@@ -3237,7 +3924,7 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
     const context = await this.integrationService.getCurrentContext();
     const notification = await this.generateContextualNotification(context);
     if (notification) {
-      new import_obsidian6.Notice(notification.message);
+      new import_obsidian7.Notice(notification.message);
       if (notification.action) {
         setTimeout(() => {
           this[notification.action]();
@@ -3262,16 +3949,32 @@ var ProactivityPlugin = class extends import_obsidian6.Plugin {
   }
   updateStatusBar(status) {
     if (this.statusBarItem) {
-      this.statusBarItem.setText(`Proactivity: ${status}`);
+      let displayStatus = status;
+      if (this.syncService) {
+        const syncStatus = this.syncService.getSyncStatus();
+        const syncIcon = syncStatus.isOnline ? "\u{1F504}" : "\u23F8\uFE0F";
+        const queueInfo = syncStatus.queuedItems > 0 ? ` (${syncStatus.queuedItems})` : "";
+        displayStatus = `${status} ${syncIcon}${queueInfo}`;
+      }
+      this.statusBarItem.setText(`Proactivity: ${displayStatus}`);
     }
   }
+  /**
+   * Start periodic status bar updates to show sync status
+   */
+  startStatusBarUpdates() {
+    setInterval(() => {
+      this.updateStatusBar("Ready");
+    }, 3e4);
+  }
 };
-var ProactivitySettingTab = class extends import_obsidian6.PluginSettingTab {
+var ProactivitySettingTab = class extends import_obsidian7.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
   display() {
+    var _a;
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Proactivity Settings" });
@@ -3280,41 +3983,41 @@ var ProactivitySettingTab = class extends import_obsidian6.PluginSettingTab {
       text: "\u{1F916} For AI-powered task breakdowns in Goblin Mode, add your OpenAI API key below. Without this, you'll get basic fallback breakdowns.",
       cls: "setting-item-description"
     });
-    new import_obsidian6.Setting(containerEl).setName("OpenAI API Key").setDesc("Get your API key from https://platform.openai.com/api-keys - enables smart task breakdown").addText((text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.apiKey).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("OpenAI API Key").setDesc("Get your API key from https://platform.openai.com/api-keys - enables smart task breakdown").addText((text) => text.setPlaceholder("sk-...").setValue(this.plugin.settings.apiKey).onChange(async (value) => {
       this.plugin.settings.apiKey = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Server URL").setDesc("Proactivity backend server URL (optional - OpenAI direct is preferred)").addText((text) => text.setPlaceholder("http://localhost:3001").setValue(this.plugin.settings.serverUrl).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Server URL").setDesc("Proactivity backend server URL (optional - OpenAI direct is preferred)").addText((text) => text.setPlaceholder("http://localhost:3001").setValue(this.plugin.settings.serverUrl).onChange(async (value) => {
       this.plugin.settings.serverUrl = value;
       await this.plugin.saveSettings();
     }));
     containerEl.createEl("h3", { text: "ADHD Support Features" });
-    new import_obsidian6.Setting(containerEl).setName("Enable Proactive Notifications").setDesc("Receive gentle, context-aware notifications and check-ins").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProactiveNotifications).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enable Proactive Notifications").setDesc("Receive gentle, context-aware notifications and check-ins").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProactiveNotifications).onChange(async (value) => {
       this.plugin.settings.enableProactiveNotifications = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Enable Pattern Detection").setDesc("Detect ADHD patterns like procrastination and hyperfocus").addToggle((toggle) => toggle.setValue(this.plugin.settings.enablePatternDetection).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enable Pattern Detection").setDesc("Detect ADHD patterns like procrastination and hyperfocus").addToggle((toggle) => toggle.setValue(this.plugin.settings.enablePatternDetection).onChange(async (value) => {
       this.plugin.settings.enablePatternDetection = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Enable Hyperfocus Protection").setDesc("Get gentle reminders during extended work sessions").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableHyperfocusProtection).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enable Hyperfocus Protection").setDesc("Get gentle reminders during extended work sessions").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableHyperfocusProtection).onChange(async (value) => {
       this.plugin.settings.enableHyperfocusProtection = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Max Daily Notifications").setDesc("Limit notifications to prevent overwhelm").addSlider((slider) => slider.setLimits(3, 20, 1).setValue(this.plugin.settings.maxDailyNotifications).setDynamicTooltip().onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Max Daily Notifications").setDesc("Limit notifications to prevent overwhelm").addSlider((slider) => slider.setLimits(3, 20, 1).setValue(this.plugin.settings.maxDailyNotifications).setDynamicTooltip().onChange(async (value) => {
       this.plugin.settings.maxDailyNotifications = value;
       await this.plugin.saveSettings();
     }));
     containerEl.createEl("h3", { text: "Obsidian Integration" });
-    new import_obsidian6.Setting(containerEl).setName("Dissertation Folder Path").setDesc("Path to your dissertation notes folder").addText((text) => text.setPlaceholder("Dissertation").setValue(this.plugin.settings.obsidianIntegration.dissertationFolderPath).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Dissertation Folder Path").setDesc("Path to your dissertation notes folder").addText((text) => text.setPlaceholder("Dissertation").setValue(this.plugin.settings.obsidianIntegration.dissertationFolderPath).onChange(async (value) => {
       this.plugin.settings.obsidianIntegration.dissertationFolderPath = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Enable Smart Linking").setDesc("Automatically create connections between related notes").addToggle((toggle) => toggle.setValue(this.plugin.settings.obsidianIntegration.enableSmartLinking).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enable Smart Linking").setDesc("Automatically create connections between related notes").addToggle((toggle) => toggle.setValue(this.plugin.settings.obsidianIntegration.enableSmartLinking).onChange(async (value) => {
       this.plugin.settings.obsidianIntegration.enableSmartLinking = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Enable Progress Tracking").setDesc("Track your writing progress and patterns").addToggle((toggle) => toggle.setValue(this.plugin.settings.obsidianIntegration.enableProgressTracking).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enable Progress Tracking").setDesc("Track your writing progress and patterns").addToggle((toggle) => toggle.setValue(this.plugin.settings.obsidianIntegration.enableProgressTracking).onChange(async (value) => {
       this.plugin.settings.obsidianIntegration.enableProgressTracking = value;
       await this.plugin.saveSettings();
     }));
@@ -3323,24 +4026,44 @@ var ProactivitySettingTab = class extends import_obsidian6.PluginSettingTab {
       text: "\u{1F504} Sync tasks, energy levels, and focus sessions with the Proactivity browser extension.",
       cls: "setting-item-description"
     });
-    new import_obsidian6.Setting(containerEl).setName("Enable Browser Extension Sync").setDesc("Sync data with browser extension via localStorage and API").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.enableSync).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enable Browser Extension Sync").setDesc("Sync data with browser extension via localStorage and API").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.enableSync).onChange(async (value) => {
       this.plugin.settings.browserExtensionSync.enableSync = value;
       await this.plugin.saveSettings();
-      if (value) {
-        this.plugin.startBrowserExtensionSync();
-      } else if (this.plugin.syncInterval) {
-        clearInterval(this.plugin.syncInterval);
-      }
     }));
-    new import_obsidian6.Setting(containerEl).setName("Sync Interval (minutes)").setDesc("How often to sync with browser extension").addSlider((slider) => slider.setLimits(1, 30, 1).setValue(this.plugin.settings.browserExtensionSync.syncInterval).setDynamicTooltip().onChange(async (value) => {
-      this.plugin.settings.browserExtensionSync.syncInterval = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian6.Setting(containerEl).setName("Sync Tasks").setDesc("Share tasks between Obsidian and browser extension").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.syncTasks).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Sync Tasks").setDesc("Share task lists between Obsidian and browser extension").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.syncTasks).onChange(async (value) => {
       this.plugin.settings.browserExtensionSync.syncTasks = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Sync Energy Levels").setDesc("Share energy level settings between platforms").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.syncEnergyLevels).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Sync Energy Levels").setDesc("Share energy tracking between platforms").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.syncEnergyLevels).onChange(async (value) => {
+      this.plugin.settings.browserExtensionSync.syncEnergyLevels = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian7.Setting(containerEl).setName("Sync Focus Sessions").setDesc("Track focus sessions across both platforms").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.syncFocusSessions).onChange(async (value) => {
+      this.plugin.settings.browserExtensionSync.syncFocusSessions = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian7.Setting(containerEl).setName("Sync Interval").setDesc("How often to sync with browser extension (minutes)").addSlider((slider) => slider.setLimits(1, 30, 1).setValue(this.plugin.settings.browserExtensionSync.syncInterval).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.browserExtensionSync.syncInterval = value;
+      await this.plugin.saveSettings();
+    }));
+    const syncStatus = (_a = this.plugin.syncService) == null ? void 0 : _a.getSyncStatus();
+    if (syncStatus) {
+      const statusText = syncStatus.isOnline ? `\u{1F7E2} Online \u2022 Last sync: ${syncStatus.lastSync ? new Date(syncStatus.lastSync).toLocaleTimeString() : "Never"} \u2022 Queued: ${syncStatus.queuedItems}` : "\u{1F534} Offline \u2022 Will sync when connection is restored";
+      new import_obsidian7.Setting(containerEl).setName("Sync Status").setDesc(statusText);
+    }
+    new import_obsidian7.Setting(containerEl).setName("Enable Browser Extension Sync").setDesc("Sync data with browser extension via localStorage and API").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.enableSync).onChange(async (value) => {
+      this.plugin.settings.browserExtensionSync.enableSync = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian7.Setting(containerEl).setName("Sync Interval (minutes)").setDesc("How often to sync with browser extension").addSlider((slider) => slider.setLimits(1, 30, 1).setValue(this.plugin.settings.browserExtensionSync.syncInterval).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.browserExtensionSync.syncInterval = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian7.Setting(containerEl).setName("Sync Tasks").setDesc("Share tasks between Obsidian and browser extension").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.syncTasks).onChange(async (value) => {
+      this.plugin.settings.browserExtensionSync.syncTasks = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian7.Setting(containerEl).setName("Sync Energy Levels").setDesc("Share energy level settings between platforms").addToggle((toggle) => toggle.setValue(this.plugin.settings.browserExtensionSync.syncEnergyLevels).onChange(async (value) => {
       this.plugin.settings.browserExtensionSync.syncEnergyLevels = value;
       await this.plugin.saveSettings();
     }));
@@ -3349,23 +4072,23 @@ var ProactivitySettingTab = class extends import_obsidian6.PluginSettingTab {
       text: "\u{1F512} Configure strict productivity enforcement to help maintain focus.",
       cls: "setting-item-description"
     });
-    new import_obsidian6.Setting(containerEl).setName("Enable Strict Mode").setDesc("Block all websites until daily tasks are completed").addToggle((toggle) => toggle.setValue(this.plugin.settings.enforcement.enableStrictMode).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enable Strict Mode").setDesc("Block all websites until daily tasks are completed").addToggle((toggle) => toggle.setValue(this.plugin.settings.enforcement.enableStrictMode).onChange(async (value) => {
       this.plugin.settings.enforcement.enableStrictMode = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Block All Websites").setDesc("When strict mode is active, block all web browsing").addToggle((toggle) => toggle.setValue(this.plugin.settings.enforcement.blockAllWebsites).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Block All Websites").setDesc("When strict mode is active, block all web browsing").addToggle((toggle) => toggle.setValue(this.plugin.settings.enforcement.blockAllWebsites).onChange(async (value) => {
       this.plugin.settings.enforcement.blockAllWebsites = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Require Daily Task Completion").setDesc("Unlock web browsing only after completing at least one task").addToggle((toggle) => toggle.setValue(this.plugin.settings.enforcement.requireDailyTaskCompletion).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Require Daily Task Completion").setDesc("Unlock web browsing only after completing at least one task").addToggle((toggle) => toggle.setValue(this.plugin.settings.enforcement.requireDailyTaskCompletion).onChange(async (value) => {
       this.plugin.settings.enforcement.requireDailyTaskCompletion = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Allowed Domains").setDesc("Domains that remain accessible even in strict mode (comma-separated)").addTextArea((text) => text.setPlaceholder("localhost, obsidian.md, github.com").setValue(this.plugin.settings.enforcement.allowedDomains.join(", ")).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Allowed Domains").setDesc("Domains that remain accessible even in strict mode (comma-separated)").addTextArea((text) => text.setPlaceholder("localhost, obsidian.md, github.com").setValue(this.plugin.settings.enforcement.allowedDomains.join(", ")).onChange(async (value) => {
       this.plugin.settings.enforcement.allowedDomains = value.split(",").map((d) => d.trim());
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Enforcement Hours").setDesc("Active enforcement time range").addText((text) => text.setPlaceholder("09:00").setValue(this.plugin.settings.enforcement.enforcementStartTime).onChange(async (value) => {
+    new import_obsidian7.Setting(containerEl).setName("Enforcement Hours").setDesc("Active enforcement time range").addText((text) => text.setPlaceholder("09:00").setValue(this.plugin.settings.enforcement.enforcementStartTime).onChange(async (value) => {
       this.plugin.settings.enforcement.enforcementStartTime = value;
       await this.plugin.saveSettings();
     })).addText((text) => text.setPlaceholder("17:00").setValue(this.plugin.settings.enforcement.enforcementEndTime).onChange(async (value) => {

@@ -48,6 +48,8 @@ See [QUICK_START.md](QUICK_START.md) for detailed setup options.
 ### 🧠 **Computer Hijacking & Gentle Interventions**
 - **Procrastination Detection**: Notices when you're on distracting sites and offers gentle nudges
 - **Tab Switching Awareness**: Helps when you're rapidly jumping between tasks (classic ADHD!)
+- **True Bidirectional Sync**: Complete synchronization between browser extension and Obsidian plugin
+- **Cross-Platform Consistency**: Tasks, energy levels, and AI breakdowns stay in sync everywhere
 - **Hyperfocus Protection**: Reminds you to take breaks during extended work sessions
 - **Context-Aware Suggestions**: Understands what you're working on and suggests next steps
 - **Energy-Matched Tasks**: Only suggests tasks that match your current mental state
@@ -154,7 +156,30 @@ Proactivity respects your need for genuine rest with sophisticated break modes:
 - **Gradual Re-engagement**: Gentle return to productivity features
 - **Custom Duration**: Set your own break periods
 
-## 🔧 Installation & Setup
+## � Cross-Platform Synchronization
+
+Proactivity features comprehensive bidirectional sync between the browser extension and Obsidian plugin:
+
+### What Syncs
+- **Tasks & Task Breakdowns**: AI-generated micro-tasks and progress status
+- **Energy Levels**: Current state and historical patterns  
+- **Focus Sessions**: Active sessions and productivity metrics
+- **ADHD Optimizations**: Motivational boosters and complexity ratings
+
+### Sync Features
+- **Real-time Updates**: Changes sync every 5 minutes by default
+- **Conflict Resolution**: Smart merging when changes occur in both places
+- **Offline Queue**: Changes are saved and synced when connection returns
+- **Status Indicators**: Visual feedback on sync status in both platforms
+
+### Usage Patterns
+- **Plan in Obsidian**: Use daily notes and AI breakdown for deep planning
+- **Execute in Browser**: Use extension for task management and focus tracking
+- **Seamless Switching**: Move between platforms without losing context
+
+See [SYNC_SYSTEM_GUIDE.md](SYNC_SYSTEM_GUIDE.md) for detailed setup and usage instructions.
+
+## �🔧 Installation & Setup
 
 ### Method 1: One-Command Setup (Recommended)
 ```bash
