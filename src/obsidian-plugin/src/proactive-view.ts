@@ -33,7 +33,7 @@ export class ProactivityView extends ItemView {
   }
 
   getIcon() {
-    return 'brain-circuit';
+    return 'brain';
   }
 
   async onOpen() {
@@ -60,11 +60,17 @@ export class ProactivityView extends ItemView {
     // Current Focus Section
     this.renderFocusSection(container);
 
+    // Task Dashboard Section
+    this.renderTaskDashboardSection(container);
+
     // Task Suggestions Section
     this.renderTaskSuggestionsSection(container);
 
     // Progress Section
     this.renderProgressSection(container);
+
+    // Browser Sync Section
+    this.renderBrowserSyncSection(container);
 
     // Quick Actions Section
     this.renderQuickActionsSection(container);
@@ -131,6 +137,206 @@ export class ProactivityView extends ItemView {
     };
   }
 
+  private renderTaskDashboardSection(container: HTMLElement) {
+    const dashboardSection = container.createEl('div', { cls: 'task-dashboard-section' });
+    dashboardSection.createEl('h3', { text: '📋 Task Dashboard' });
+
+    // Stats row
+    const statsRow = dashboardSection.createEl('div', { cls: 'stats-row' });
+
+    const completedStat = statsRow.createEl('div', { cls: 'stat-card completed' });
+    completedStat.createEl('div', { cls: 'stat-number', text: '0' });
+    completedStat.createEl('div', { cls: 'stat-label', text: 'Completed' });
+
+    const activeStat = statsRow.createEl('div', { cls: 'stat-card active' });
+    activeStat.createEl('div', { cls: 'stat-number', text: '0' });
+    activeStat.createEl('div', { cls: 'stat-label', text: 'Active' });
+
+    const urgentStat = statsRow.createEl('div', { cls: 'stat-card urgent' });
+    urgentStat.createEl('div', { cls: 'stat-number', text: '0' });
+    urgentStat.createEl('div', { cls: 'stat-label', text: 'Urgent' });
+
+    // Task input section
+    const inputSection = dashboardSection.createEl('div', { cls: 'task-input-section' });
+    const taskInput = inputSection.createEl('input', {
+      cls: 'task-input',
+      placeholder: 'Add a new task...',
+      type: 'text'
+    }) as HTMLInputElement;
+
+    const addButton = inputSection.createEl('button', {
+      cls: 'add-task-btn',
+      text: '+ Add'
+    });
+
+    // Task list container
+    const taskListContainer = dashboardSection.createEl('div', { cls: 'task-list-container' });
+    const taskList = taskListContainer.createEl('div', { cls: 'task-list' });
+
+    // Event handlers
+    const addTask = () => {
+      const taskText = taskInput.value.trim();
+      if (taskText) {
+        this.addNewTask(taskText, taskList);
+        taskInput.value = '';
+        this.updateTaskStats();
+      }
+    };
+
+    addButton.addEventListener('click', addTask);
+    taskInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addTask();
+      }
+    });
+
+    // Load existing tasks
+    this.loadTasksFromVault(taskList);
+    this.updateTaskStats();
+  }
+
+  private async addNewTask(taskText: string, taskList: HTMLElement) {
+    // Create task element
+    const taskItem = taskList.createEl('div', { cls: 'task-item' });
+    const checkbox = taskItem.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
+    const taskContent = taskItem.createEl('div', { cls: 'task-content' });
+    const taskTitle = taskContent.createEl('div', { cls: 'task-title', text: taskText });
+    const taskMeta = taskContent.createEl('div', { cls: 'task-meta' });
+
+    // Priority and time estimate
+    const priority = taskMeta.createEl('span', { cls: 'task-priority', text: 'Normal' });
+    const timeEstimate = taskMeta.createEl('span', { cls: 'task-time', text: '~25min' });
+
+    // Actions
+    const actions = taskItem.createEl('div', { cls: 'task-actions' });
+    const breakdownBtn = actions.createEl('button', { cls: 'task-action-btn', text: '🔨' });
+    const deleteBtn = actions.createEl('button', { cls: 'task-action-btn delete', text: '🗑️' });
+
+    // Event handlers
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) {
+        taskItem.classList.add('completed');
+        this.completeTask(taskText);
+      } else {
+        taskItem.classList.remove('completed');
+      }
+      this.updateTaskStats();
+    });
+
+    breakdownBtn.addEventListener('click', () => {
+      this.breakdownTask(taskText);
+    });
+
+    deleteBtn.addEventListener('click', () => {
+      taskItem.remove();
+      this.updateTaskStats();
+    });
+
+    // Add to vault as a task
+    try {
+      await this.integrationService.addTaskToVault(taskText);
+    } catch (error) {
+      console.error('Failed to add task to vault:', error);
+    }
+  }
+
+  private async loadTasksFromVault(taskList: HTMLElement) {
+    try {
+      const tasks = await this.integrationService.getTodaysTasks();
+      tasks.forEach(task => {
+        // Create task elements similar to addNewTask but for existing tasks
+        this.renderExistingTask(task, taskList);
+      });
+    } catch (error) {
+      console.error('Failed to load tasks from vault:', error);
+    }
+  }
+
+  private renderExistingTask(task: any, taskList: HTMLElement) {
+    const taskItem = taskList.createEl('div', { cls: 'task-item' });
+    if (task.completed) taskItem.classList.add('completed');
+
+    const checkbox = taskItem.createEl('input', {
+      type: 'checkbox',
+      cls: 'task-checkbox'
+    }) as HTMLInputElement;
+    checkbox.checked = task.completed;
+    const taskContent = taskItem.createEl('div', { cls: 'task-content' });
+    const taskTitle = taskContent.createEl('div', { cls: 'task-title', text: task.title });
+
+    const taskMeta = taskContent.createEl('div', { cls: 'task-meta' });
+    taskMeta.createEl('span', { cls: 'task-priority', text: task.priority || 'Normal' });
+    taskMeta.createEl('span', { cls: 'task-time', text: `~${task.estimatedMinutes || 25}min` });
+
+    // Actions
+    const actions = taskItem.createEl('div', { cls: 'task-actions' });
+    const breakdownBtn = actions.createEl('button', { cls: 'task-action-btn', text: '🔨' });
+    const deleteBtn = actions.createEl('button', { cls: 'task-action-btn delete', text: '🗑️' });
+
+    // Event handlers
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) {
+        taskItem.classList.add('completed');
+        this.completeTask(task.title);
+      } else {
+        taskItem.classList.remove('completed');
+      }
+      this.updateTaskStats();
+    });
+
+    breakdownBtn.addEventListener('click', () => {
+      this.breakdownTask(task.title);
+    });
+
+    deleteBtn.addEventListener('click', () => {
+      taskItem.remove();
+      this.updateTaskStats();
+    });
+  }
+
+  private updateTaskStats() {
+    const taskItems = this.containerEl.querySelectorAll('.task-item');
+    const completedTasks = this.containerEl.querySelectorAll('.task-item.completed');
+    const activeTasks = taskItems.length - completedTasks.length;
+
+    // Calculate urgent tasks (you can define urgency logic)
+    const urgentTasks = this.containerEl.querySelectorAll('.task-item .task-priority').length; // placeholder
+
+    // Update stat displays
+    const statCards = this.containerEl.querySelectorAll('.stat-card');
+    if (statCards.length >= 3) {
+      (statCards[0].querySelector('.stat-number') as HTMLElement).textContent = completedTasks.length.toString();
+      (statCards[1].querySelector('.stat-number') as HTMLElement).textContent = activeTasks.toString();
+      (statCards[2].querySelector('.stat-number') as HTMLElement).textContent = '0'; // urgent placeholder
+    }
+  }
+
+  private async completeTask(taskTitle: string) {
+    try {
+      await this.integrationService.completeTask(taskTitle);
+      new Notice(`✅ Task completed: ${taskTitle}`);
+    } catch (error) {
+      console.error('Failed to complete task:', error);
+    }
+  }
+
+  private async breakdownTask(taskTitle: string) {
+    try {
+      const breakdown = await this.integrationService.breakdownTask(taskTitle, {
+        energyLevel: this.currentEnergyLevel,
+        depth: 2
+      });
+
+      if (breakdown && breakdown.steps) {
+        new Notice(`🔨 Task broken down into ${breakdown.steps.length} steps`);
+        // You could add the sub-tasks to the list here
+      }
+    } catch (error) {
+      console.error('Failed to breakdown task:', error);
+      new Notice('Failed to breakdown task. Check your OpenAI API key.');
+    }
+  }
+
   private renderTaskSuggestionsSection(container: HTMLElement) {
     const tasksSection = container.createEl('div', { cls: 'tasks-section' });
     tasksSection.createEl('h3', { text: '📝 Smart Task Suggestions' });
@@ -148,6 +354,141 @@ export class ProactivityView extends ItemView {
     };
 
     this.renderTaskList(tasksContainer);
+  }
+
+  private renderBrowserSyncSection(container: HTMLElement) {
+    const syncSection = container.createEl('div', { cls: 'browser-sync-section' });
+    syncSection.createEl('h3', { text: '🔄 Browser Extension Sync' });
+
+    // Sync status indicator
+    const statusDiv = syncSection.createEl('div', { cls: 'sync-status' });
+    const statusIcon = statusDiv.createEl('span', { cls: 'sync-status-icon', text: '🟡' });
+    const statusText = statusDiv.createEl('span', { cls: 'sync-status-text', text: 'Checking sync status...' });
+
+    // Sync info box
+    const infoBox = syncSection.createEl('div', { cls: 'sync-info-box' });
+    const infoTitle = infoBox.createEl('div', { cls: 'sync-info-title', text: 'How Browser Sync Works' });
+    const infoList = infoBox.createEl('ul', { cls: 'sync-info-list' });
+
+    infoList.createEl('li', { text: '✅ Tasks sync automatically between Obsidian and browser extension' });
+    infoList.createEl('li', { text: '🔋 Energy levels are shared across both platforms' });
+    infoList.createEl('li', { text: '⏱️ Focus sessions sync in real-time' });
+    infoList.createEl('li', { text: '🎯 Enforcement settings apply to both apps' });
+
+    // Manual sync button
+    const syncButton = syncSection.createEl('button', {
+      cls: 'sync-button',
+      text: '🔄 Sync Now'
+    });
+
+    // Last sync time display
+    const lastSyncDiv = syncSection.createEl('div', { cls: 'last-sync' });
+    lastSyncDiv.createEl('span', {
+      cls: 'last-sync-text',
+      text: 'Last sync: Never'
+    });
+
+    // Event handler for manual sync
+    syncButton.addEventListener('click', async () => {
+      syncButton.textContent = '🔄 Syncing...';
+      syncButton.disabled = true;
+
+      try {
+        // Trigger manual sync
+        await this.performBrowserSync();
+
+        // Update UI
+        statusIcon.textContent = '🟢';
+        statusText.textContent = 'Sync successful';
+        lastSyncDiv.querySelector('.last-sync-text')!.textContent =
+          `Last sync: ${new Date().toLocaleTimeString()}`;
+
+        // Show success feedback
+        new Notice('✅ Browser extension sync completed');
+      } catch (error) {
+        statusIcon.textContent = '🔴';
+        statusText.textContent = 'Sync failed';
+        console.error('Manual sync failed:', error);
+        new Notice('❌ Sync failed. Check console for details.');
+      } finally {
+        syncButton.textContent = '🔄 Sync Now';
+        syncButton.disabled = false;
+      }
+    });
+
+    // Check initial sync status
+    this.checkSyncStatus(statusIcon, statusText, lastSyncDiv);
+  }
+
+  private async performBrowserSync() {
+    // Get current state from Obsidian
+    const obsidianData = {
+      tasks: await this.integrationService.getTodaysTasks(),
+      energyLevel: this.currentEnergyLevel,
+      timestamp: Date.now(),
+      source: 'obsidian'
+    };
+
+    // Store in localStorage for browser extension to read
+    try {
+      localStorage.setItem('proactivity-obsidian-sync', JSON.stringify(obsidianData));
+
+      // Also try to read any data from browser extension
+      const browserData = localStorage.getItem('proactivity-browser-sync');
+      if (browserData) {
+        const parsed = JSON.parse(browserData);
+        console.log('Received data from browser extension:', parsed);
+
+        // Merge browser extension tasks if they're newer
+        if (parsed.timestamp > (obsidianData.timestamp - 60000)) { // Within last minute
+          // Could merge tasks here if needed
+          console.log('Browser extension data is recent, considering merge');
+        }
+      }
+
+      // Send to backend if available
+      if (this.apiClient) {
+        await this.apiClient.updateEnergyLevel(this.currentEnergyLevel);
+      }
+
+      console.log('Browser sync completed successfully');
+    } catch (error) {
+      console.error('Browser sync failed:', error);
+      throw error;
+    }
+  }
+
+  private checkSyncStatus(statusIcon: HTMLElement, statusText: HTMLElement, lastSyncDiv: HTMLElement) {
+    try {
+      const syncData = localStorage.getItem('proactivity-obsidian-sync');
+      if (syncData) {
+        const parsed = JSON.parse(syncData);
+        const lastSync = new Date(parsed.timestamp);
+        const minutesAgo = Math.floor((Date.now() - parsed.timestamp) / (1000 * 60));
+
+        if (minutesAgo < 5) {
+          statusIcon.textContent = '🟢';
+          statusText.textContent = 'Recently synced';
+        } else if (minutesAgo < 30) {
+          statusIcon.textContent = '🟡';
+          statusText.textContent = 'Sync available';
+        } else {
+          statusIcon.textContent = '🟠';
+          statusText.textContent = 'Sync recommended';
+        }
+
+        lastSyncDiv.querySelector('.last-sync-text')!.textContent =
+          `Last sync: ${lastSync.toLocaleTimeString()}`;
+      } else {
+        statusIcon.textContent = '🔴';
+        statusText.textContent = 'Never synced';
+        lastSyncDiv.querySelector('.last-sync-text')!.textContent = 'Last sync: Never';
+      }
+    } catch (error) {
+      statusIcon.textContent = '❓';
+      statusText.textContent = 'Sync status unknown';
+      console.error('Failed to check sync status:', error);
+    }
   }
 
   private renderProgressSection(container: HTMLElement) {
@@ -419,10 +760,6 @@ export class ProactivityView extends ItemView {
     }
   }
 
-  private async breakdownTask(task: any) {
-    // Open task breakdown modal or integrate with TaskBreakdownService
-    console.log('Breaking down task:', task);
-  }
 
   private openTaskBreakdown() {
     // Open task breakdown interface

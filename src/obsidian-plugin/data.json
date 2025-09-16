@@ -8,6 +8,27 @@
   "enableHyperfocusProtection": true,
   "procrastinationThreshold": 30,
   "energyCheckInterval": 120,
+  "browserExtensionSync": {
+    "enableSync": true,
+    "syncInterval": 5,
+    "lastSyncTimestamp": 1758024889693,
+    "syncTasks": true,
+    "syncEnergyLevels": true,
+    "syncFocusSessions": true,
+    "syncEnforcementSettings": true
+  },
+  "enforcement": {
+    "enableStrictMode": false,
+    "blockAllWebsites": false,
+    "requireDailyTaskCompletion": false,
+    "allowedDomains": [
+      "localhost",
+      "obsidian.md",
+      "github.com"
+    ],
+    "enforcementStartTime": "09:00",
+    "enforcementEndTime": "17:00"
+  },
   "obsidianIntegration": {
     "enableTaskSync": true,
     "enableProgressTracking": true,

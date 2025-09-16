@@ -187,7 +187,7 @@ export class ProactivityApiClient {
    * Update user energy level
    */
   async updateEnergyLevel(energyLevel: string) {
-    return this.makeRequest('/api/patterns/energy', {
+    return this.makeRequest('/users/energy-log', {
       method: 'POST',
       body: JSON.stringify({
         energyLevel,
@@ -201,7 +201,7 @@ export class ProactivityApiClient {
    * Record user activity for pattern detection
    */
   async recordActivity(activityType: string, data: any) {
-    return this.makeRequest('/api/patterns/activity', {
+    return this.makeRequest('/patterns/detect', {
       method: 'POST',
       body: JSON.stringify({
         type: activityType,
@@ -216,7 +216,7 @@ export class ProactivityApiClient {
    * Get ADHD patterns and insights
    */
   async getPatterns() {
-    return this.makeRequest('/api/patterns');
+    return this.makeRequest('/patterns/insights');
   }
 
   /**

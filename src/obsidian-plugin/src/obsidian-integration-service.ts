@@ -309,24 +309,6 @@ Tags: ${this.settings.obsidianIntegration.taskTagPrefix}/quick-note
     }));
   }
 
-  /**
-   * Get today's tasks from daily note
-   */
-  async getTodaysTasks(): Promise<any[]> {
-    const dailyNotePath = await this.getDailyNotePath();
-    if (!dailyNotePath) return [];
-
-    try {
-      const file = this.app.vault.getAbstractFileByPath(dailyNotePath);
-      if (!file || !(file instanceof TFile)) return [];
-
-      const content = await this.app.vault.read(file);
-      return this.extractTasksFromContent(content);
-    } catch (error) {
-      console.error('Error getting today\'s tasks:', error);
-      return [];
-    }
-  }
 
   /**
    * Check if there are unfinished tasks
@@ -804,5 +786,118 @@ Generate 3-4 clarifying questions that would help make this task more actionable
       questions.push('Can this be split into smaller independent parts?');
     }
     return [...new Set(questions)].slice(0, 4);
+  }
+
+  /**
+   * Add a task to the vault (usually in daily notes)
+   */
+  async addTaskToVault(taskTitle: string, priority: string = 'normal'): Promise<void> {
+    const dailyNotePath = await this.getDailyNotePath();
+    if (!dailyNotePath) return;
+
+    try {
+      const file = this.app.vault.getAbstractFileByPath(dailyNotePath) as TFile;
+      let content = '';
+
+      if (file) {
+        content = await this.app.vault.read(file);
+      } else {
+        // Create daily note if it doesn't exist
+        content = `# ${new Date().toDateString()}\n\n## Tasks\n\n`;
+      }
+
+      // Add task to content
+      const taskLine = `- [ ] ${taskTitle}`;
+      const priorityMarker = priority === 'high' ? ' !!!' : priority === 'low' ? ' !' : '';
+      const newTaskLine = `${taskLine}${priorityMarker}\n`;
+
+      // Find or create tasks section
+      if (content.includes('## Tasks')) {
+        content = content.replace('## Tasks\n', `## Tasks\n${newTaskLine}`);
+      } else {
+        content += `\n## Tasks\n${newTaskLine}`;
+      }
+
+      // Write back to file
+      if (file) {
+        await this.app.vault.modify(file, content);
+      } else {
+        await this.app.vault.create(dailyNotePath, content);
+      }
+
+      console.log(`Task added to vault: ${taskTitle}`);
+    } catch (error) {
+      console.error('Failed to add task to vault:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark a task as completed
+   */
+  async completeTask(taskTitle: string): Promise<void> {
+    const dailyNotePath = await this.getDailyNotePath();
+    if (!dailyNotePath) return;
+
+    try {
+      const file = this.app.vault.getAbstractFileByPath(dailyNotePath) as TFile;
+      if (!file) return;
+
+      const content = await this.app.vault.read(file);
+      const updatedContent = content.replace(
+        new RegExp(`- \\[ \\] ${taskTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+        `- [x] ${taskTitle}`
+      );
+
+      await this.app.vault.modify(file, updatedContent);
+      console.log(`Task completed: ${taskTitle}`);
+    } catch (error) {
+      console.error('Failed to complete task:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get today's tasks from daily note
+   */
+  async getTodaysTasks(): Promise<any[]> {
+    const dailyNotePath = await this.getDailyNotePath();
+    if (!dailyNotePath) return [];
+
+    try {
+      const file = this.app.vault.getAbstractFileByPath(dailyNotePath) as TFile;
+      if (!file) return [];
+
+      const content = await this.app.vault.read(file);
+      const tasks = [];
+      const taskRegex = /^- \[([ x])\] (.+)$/gm;
+      let match;
+
+      while ((match = taskRegex.exec(content)) !== null) {
+        const completed = match[1] === 'x';
+        const title = match[2];
+
+        // Extract priority from title
+        const priorityMatch = title.match(/(.+?)\s*(!{1,3})$/);
+        const cleanTitle = priorityMatch ? priorityMatch[1] : title;
+        const priority = priorityMatch
+          ? (priorityMatch[2] === '!!!' ? 'high' : priorityMatch[2] === '!' ? 'low' : 'normal')
+          : 'normal';
+
+        tasks.push({
+          id: `task-${Date.now()}-${tasks.length}`,
+          title: cleanTitle,
+          completed,
+          priority,
+          source: 'daily-note',
+          estimatedMinutes: 25 // default estimate
+        });
+      }
+
+      return tasks;
+    } catch (error) {
+      console.error('Failed to get today\'s tasks:', error);
+      return [];
+    }
   }
 }

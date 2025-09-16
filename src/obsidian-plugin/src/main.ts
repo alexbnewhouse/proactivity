@@ -53,7 +53,7 @@ export interface ProactivitySettings {
 
 const DEFAULT_SETTINGS: ProactivitySettings = {
   apiKey: '',
-  serverUrl: 'http://localhost:3002',
+  serverUrl: 'http://localhost:3001',
   enableProactiveNotifications: true,
   maxDailyNotifications: 12,
   defaultBreakdownDepth: 3,
@@ -104,62 +104,74 @@ export default class ProactivityPlugin extends Plugin {
   syncInterval: NodeJS.Timeout;
 
   async onload() {
-    await this.loadSettings();
+    try {
+      await this.loadSettings();
 
-    // Initialize core services
-    this.integrationService = new ObsidianIntegrationService(this.app, this.settings);
-    this.patternDetector = new ADHDPatternDetector(this.app, this.settings);
+      // Initialize core services
+      this.integrationService = new ObsidianIntegrationService(this.app, this.settings);
+      this.patternDetector = new ADHDPatternDetector(this.app, this.settings);
 
-    // Test backend connection
-    await this.testBackendConnection();
+      // Add status bar item early to prevent undefined errors
+      this.statusBarItem = this.addStatusBarItem();
+      this.updateStatusBar('Initializing...');
 
-    // Register view for main interface
-    this.registerView(
-      VIEW_TYPE_PROACTIVITY,
-      (leaf) => new ProactivityView(leaf, this.settings, this.integrationService)
-    );
+      // Test backend connection
+      await this.testBackendConnection();
 
-    // Add ribbon icon for quick access
-    this.addRibbonIcon('brain-circuit', 'Proactivity', () => {
-      this.activateView();
-    });
+      // Register view for main interface
+      this.registerView(
+        VIEW_TYPE_PROACTIVITY,
+        (leaf) => new ProactivityView(leaf, this.settings, this.integrationService)
+      );
 
-    // Add status bar item for energy/focus state
-    this.statusBarItem = this.addStatusBarItem();
-    this.updateStatusBar('Ready');
+      // Add ribbon icon for quick access
+      this.addRibbonIcon('brain', 'Proactivity', () => {
+        this.activateView();
+      });
 
-    // Register commands
-    this.registerCommands();
+      // Status bar already initialized above
+      this.updateStatusBar('Ready');
 
-    // Start pattern detection if enabled
-    if (this.settings.enablePatternDetection) {
-      this.patternDetector.startDetection();
+      // Register commands
+      this.registerCommands();
+
+      // Start pattern detection if enabled
+      if (this.settings.enablePatternDetection) {
+        this.patternDetector.startDetection();
+      }
+
+      // Start proactive notifications if enabled
+      if (this.settings.enableProactiveNotifications) {
+        this.startProactiveNotifications();
+      }
+
+      // Start browser extension sync if enabled
+      if (this.settings.browserExtensionSync.enableSync) {
+        this.startBrowserExtensionSync();
+      }
+
+      // Add settings tab
+      this.addSettingTab(new ProactivitySettingTab(this.app, this));
+
+      new Notice('Proactivity: Your ADHD-friendly dissertation assistant is ready!');
+
+      // Simple global for debugging
+      // @ts-ignore
+      (window as any).Proactivity = {
+        ctx: () => this.integrationService.getCurrentContext(),
+        suggestions: (lvl: string) => this.integrationService.getTaskSuggestions(lvl || 'moderate'),
+        celebrate: () => this.celebrateProgress(),
+        sync: () => this.syncWithBrowserExtension(),
+        getUrgentTasks: () => this.getUrgentTasks()
+      };
+    } catch (error) {
+      console.error('Proactivity Plugin: Failed to initialize:', error);
+      new Notice('❌ Proactivity Plugin failed to load. Check console for details.', 8000);
+
+      // Initialize minimal functionality to prevent complete failure
+      this.statusBarItem = this.addStatusBarItem();
+      this.updateStatusBar('Error - check console');
     }
-
-    // Start proactive notifications if enabled
-    if (this.settings.enableProactiveNotifications) {
-      this.startProactiveNotifications();
-    }
-
-    // Start browser extension sync if enabled
-    if (this.settings.browserExtensionSync.enableSync) {
-      this.startBrowserExtensionSync();
-    }
-
-    // Add settings tab
-    this.addSettingTab(new ProactivitySettingTab(this.app, this));
-
-    new Notice('Proactivity: Your ADHD-friendly dissertation assistant is ready!');
-
-    // Simple global for debugging
-    // @ts-ignore
-    (window as any).Proactivity = {
-      ctx: () => this.integrationService.getCurrentContext(),
-      suggestions: (lvl: string) => this.integrationService.getTaskSuggestions(lvl || 'moderate'),
-      celebrate: () => this.celebrateProgress(),
-      sync: () => this.syncWithBrowserExtension(),
-      getUrgentTasks: () => this.getUrgentTasks()
-    };
   }
 
   private async testBackendConnection() {
@@ -1064,7 +1076,9 @@ export default class ProactivityPlugin extends Plugin {
   }
 
   updateStatusBar(status: string) {
-    this.statusBarItem.setText(`Proactivity: ${status}`);
+    if (this.statusBarItem) {
+      this.statusBarItem.setText(`Proactivity: ${status}`);
+    }
   }
 }
 
