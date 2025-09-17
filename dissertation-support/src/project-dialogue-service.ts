@@ -267,9 +267,20 @@ Please create a structured project plan that breaks this work into manageable ph
       return null;
     }
 
-    const session = this.activeSessions.get(sessionId);
+    let session = this.activeSessions.get(sessionId);
     if (!session) {
-      throw new Error('Session not found');
+      // Fallback: try to find the most recent session if the specified one is not found
+      console.warn(`[ProjectDialogue] Session ${sessionId} not found, attempting to use most recent session`);
+      const sessions = Array.from(this.activeSessions.values());
+      if (sessions.length === 0) {
+        console.error('[ProjectDialogue] No active sessions available for Kanban creation');
+        return null;
+      }
+      
+      session = sessions.reduce((latest, current) => 
+        current.updated > latest.updated ? current : latest
+      );
+      console.log(`[ProjectDialogue] Using fallback session: ${session.id}`);
     }
 
     try {
