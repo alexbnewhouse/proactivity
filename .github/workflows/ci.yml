@@ -23,8 +23,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: |
-          dissertation-support/package-lock.json
+        cache-dependency-path: dissertation-support/package-lock.json
     
     - name: Install root dependencies
       run: |
@@ -225,7 +224,7 @@ jobs:
         path: |
           src/backend/server-test.log
           src/backend/server.log
-          *.log
+        if-no-files-found: ignore
     
     - name: Upload build artifacts
       if: success()
@@ -236,9 +235,7 @@ jobs:
           dissertation-support/main.js
           dissertation-support/manifest.json
           dissertation-support/styles.css
-          src/obsidian-plugin/main.js
-          src/obsidian-plugin/manifest.json
-          src/browser-extension/
+        if-no-files-found: ignore
 
   security-scan:
     runs-on: ubuntu-latest

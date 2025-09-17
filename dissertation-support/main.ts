@@ -2008,6 +2008,59 @@ class ProjectDialogueModal extends Modal {
 			cls: 'ds-dialogue-intro' 
 		});
 
+		// Show project type selection first
+		await this.showProjectTypeSelection();
+	}
+
+	private async showProjectTypeSelection(): Promise<void> {
+		const { contentEl } = this;
+		
+		// Project type selection
+		const typeContainer = contentEl.createDiv({ cls: 'ds-project-type-selection' });
+		typeContainer.createEl('h3', { text: 'What type of project are you working on?' });
+		
+		const projectTypes = [
+			{ value: 'dissertation', label: '🎓 Dissertation', desc: 'Full dissertation project with AI-powered planning' },
+			{ value: 'chapter', label: '📖 Dissertation Chapter', desc: 'Individual chapter or section' },
+			{ value: 'proposal', label: '📋 Research Proposal', desc: 'Grant proposal or research plan' },
+			{ value: 'paper', label: '📄 Academic Paper', desc: 'Journal article or conference paper' },
+			{ value: 'other', label: '💼 Other Project', desc: 'General academic or research project' }
+		];
+
+		const typeButtonsContainer = typeContainer.createDiv({ cls: 'ds-type-buttons' });
+		
+		projectTypes.forEach(type => {
+			const typeButton = typeButtonsContainer.createDiv({ cls: 'ds-type-button' });
+			
+			const typeHeader = typeButton.createDiv({ cls: 'ds-type-header' });
+			typeHeader.createSpan({ text: type.label, cls: 'ds-type-label' });
+			
+			typeButton.createDiv({ text: type.desc, cls: 'ds-type-desc' });
+			
+			typeButton.addEventListener('click', async () => {
+				// Highlight selected type
+				typeButtonsContainer.querySelectorAll('.ds-type-button').forEach(btn => btn.removeClass('selected'));
+				typeButton.addClass('selected');
+				
+				// Start dialogue with selected project type
+				await this.startDialogueWithType(type.value);
+			});
+		});
+	}
+
+	private async startDialogueWithType(projectType: string): Promise<void> {
+		const { contentEl } = this;
+		
+		// Clear the type selection and show progress UI
+		contentEl.empty();
+		
+		// Header
+		contentEl.createEl('h2', { text: '🚀 Start New Project' });
+		contentEl.createDiv({ 
+			text: `Setting up your ${projectType} project with tailored questions and planning.`,
+			cls: 'ds-dialogue-intro' 
+		});
+
 		// Progress bar
 		const progressContainer = contentEl.createDiv({ cls: 'ds-progress-container' });
 		progressContainer.createDiv({ text: 'Progress:', cls: 'ds-progress-label' });
@@ -2017,9 +2070,11 @@ class ProjectDialogueModal extends Modal {
 		// Question container
 		this.questionContainer = contentEl.createDiv({ cls: 'ds-question-container' });
 
-		// Start the dialogue
+		// Start the dialogue with the selected project type
 		try {
-			this.currentSession = await this.dialogueService.startProjectDialogue();
+			this.currentSession = await this.dialogueService.startProjectDialogue({
+				type: projectType as any
+			});
 			await this.showNextQuestion();
 		} catch (error) {
 			this.questionContainer.createEl('p', { 
