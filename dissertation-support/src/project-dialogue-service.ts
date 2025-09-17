@@ -549,10 +549,47 @@ Please create a structured project plan that breaks this work into manageable ph
       return `Q: ${question?.text}\nA: ${r.answer}`;
     }).join('\n\n');
 
+    // Extract key context for enhanced AI prompting
+    const title = session.projectContext.title || 'Untitled Project';
+    const deadline = session.projectContext.deadline;
+    const dissertationStage = session.responses.find(r => r.questionId === 'dissertation_stage')?.answer;
+    const methodology = session.responses.find(r => r.questionId === 'methodology')?.answer;
+    const timeline = session.responses.find(r => r.questionId === 'timeline')?.answer;
+    const mainConcern = session.projectContext.mainConcern;
+
+    // Calculate timeline context
+    let timelineContext = '';
+    if (deadline) {
+      const deadlineDate = new Date(deadline);
+      const now = new Date();
+      const monthsRemaining = Math.max(0, Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+      timelineContext = `\nTimeline: ${monthsRemaining} months until deadline (${deadline})`;
+      
+      if (monthsRemaining <= 6) {
+        timelineContext += '\n⚠️ SHORT TIMELINE: Focus on essential tasks and efficient workflows';
+      } else if (monthsRemaining <= 12) {
+        timelineContext += '\n📅 MODERATE TIMELINE: Balance thoroughness with time constraints';
+      } else {
+        timelineContext += '\n⏰ EXTENDED TIMELINE: Opportunity for comprehensive development';
+      }
+    }
+
     return `Project Type: ${session.projectContext.type}
-    
+Title: ${title}${timelineContext}
+
+DISCIPLINE CONTEXT: 
+- This is a POLITICAL SCIENCE dissertation requiring rigorous methodology
+- Must follow standard political science dissertation structure (5-6 chapters)
+- Needs to contribute to political science theory and/or empirical knowledge
+- Should consider publication potential in political science journals
+${dissertationStage ? `- Current stage: ${dissertationStage}` : ''}
+${methodology ? `- Planned methodology: ${methodology}` : ''}
+${mainConcern ? `- Main concern: ${mainConcern}` : ''}
+
 Dialogue Responses:
-${responses}`;
+${responses}
+
+IMPORTANT: Create a plan specifically tailored to political science standards, incorporating theoretical frameworks, empirical analysis appropriate to the subfield, and consideration of both prospectus defense and final defense milestones.`;
   }
 
   private parseProjectPlan(aiResponse: string, session: DialogueSession): ProjectPlan {

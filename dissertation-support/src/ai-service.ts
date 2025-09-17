@@ -291,8 +291,20 @@ Keep it short and actionable.`;
    */
   private buildSystemPrompt(planType: 'dissertation' | 'prospectus'): string {
     return planType === 'prospectus'
-      ? 'You are an expert academic advisor helping students craft rigorous yet manageable dissertation prospectus documents. Emphasize scope clarity and early risk reduction.'
-      : 'You are an expert academic advisor specializing in helping ADHD students complete dissertations. Focus on breaking down complex academic work into specific, actionable micro-tasks.';
+      ? `You are an expert political science advisor specializing in dissertation prospectus development. You understand the rigorous standards of political science methodology, the importance of theoretical frameworks, and the need for clear research design. Create prospectus plans that emphasize:
+      - Theoretical contribution and literature gap identification
+      - Methodological rigor appropriate to political science subfields
+      - Feasible data collection and analysis plans
+      - Clear timeline that allows for IRB approval, pilot studies, and revision cycles
+      - Risk mitigation for common political science research challenges (access, measurement, external validity)`
+      : `You are an expert political science advisor specializing in helping graduate students complete dissertations in political science. You understand the specific requirements and structure expected in political science dissertations, including:
+      - Standard 5-chapter structure (Introduction, Literature Review, Theory/Methods, Analysis chapters, Conclusion)
+      - Importance of theory-driven research questions and hypotheses
+      - Methodological rigor in empirical political science (quantitative, qualitative, mixed methods)
+      - Publication and conference presentation strategies
+      - Job market timing and considerations
+      - ADHD-friendly task breakdown while maintaining academic rigor
+      Focus on creating specific, actionable micro-tasks that build toward both prospectus defense and final defense milestones.`;
   }
 
   /**
@@ -303,18 +315,86 @@ Keep it short and actionable.`;
     topic: string, 
     additionalContext?: string
   ): string {
-    const basePrompt = `Please create a detailed ${planType} plan for the topic: "${topic}"
-    
-Focus on:
-- Breaking down complex tasks into specific, actionable micro-tasks
-- Realistic timelines and milestones
-- Risk identification and mitigation strategies
-- Progress tracking mechanisms
-- ADHD-friendly organization (clear structure, manageable chunks)
-    
-${additionalContext ? `Additional context: ${additionalContext}` : ''}`;
-    
-    return basePrompt;
+    const basePrompt = planType === 'prospectus' 
+      ? `Please create a detailed political science dissertation prospectus plan for: "${topic}"
+
+Structure the plan for a political science prospectus defense, including:
+
+1. **Research Question & Theory Development** (Weeks 1-4)
+   - Refine research question with clear dependent and independent variables
+   - Develop theoretical framework drawing from relevant political science literature
+   - Identify contribution to existing scholarship
+
+2. **Literature Review & Gap Identification** (Weeks 5-8)  
+   - Systematic review of relevant political science literature
+   - Identify theoretical and empirical gaps your research will address
+   - Position your work within subfield debates
+
+3. **Research Design & Methodology** (Weeks 9-12)
+   - Choose appropriate methodology (quantitative, qualitative, mixed methods)
+   - Design data collection strategy
+   - Address issues of validity, reliability, and generalizability
+   - Plan for IRB approval if needed
+
+4. **Pilot Study & Revision** (Weeks 13-16)
+   - Conduct small pilot study or preliminary analysis
+   - Refine methodology based on initial findings
+   - Prepare prospectus defense presentation
+
+5. **Defense Preparation** (Weeks 17-18)
+   - Finalize prospectus document
+   - Prepare defense presentation with clear research design
+   - Anticipate committee questions
+
+Make tasks ADHD-friendly (15-45 minutes each) while maintaining academic rigor.`
+      
+      : `Please create a comprehensive political science dissertation plan for: "${topic}"
+
+Create a plan that addresses BOTH prospectus defense and final defense milestones:
+
+**PHASE 1: PROSPECTUS DEVELOPMENT** (Months 1-6)
+- Research question refinement and theoretical framework development
+- Comprehensive literature review with gap identification  
+- Research design and methodology selection
+- IRB preparation and approval process
+- Pilot study or preliminary data collection
+- Prospectus writing and defense preparation
+
+**PHASE 2: DISSERTATION RESEARCH** (Months 7-18)
+- Primary data collection (surveys, interviews, archival research, etc.)
+- Data analysis using appropriate political science methods
+- Chapter drafting following standard 5-chapter structure:
+  * Chapter 1: Introduction with theory and hypotheses
+  * Chapter 2: Literature Review  
+  * Chapter 3: Research Design and Methods
+  * Chapter 4-5: Empirical Analysis chapters
+  * Chapter 6: Conclusion with implications
+
+**PHASE 3: WRITING & DEFENSE** (Months 19-24)
+- Complete dissertation draft
+- Committee feedback integration
+- Job market preparation (if applicable)
+- Conference presentations and publication preparation
+- Final defense preparation
+
+Consider political science career timeline:
+- Job market applications (Fall of final year)
+- Conference presentation opportunities (APSA, regional meetings)
+- Publication pipeline development
+
+Break down each phase into ADHD-friendly micro-tasks (15-45 minutes each) that build systematically toward both defense milestones.`;
+
+    return `${basePrompt}
+
+${additionalContext ? `Additional context: ${additionalContext}` : ''}
+
+Format the response as a detailed project plan with:
+- Clear phase structure
+- Specific, actionable micro-tasks
+- Realistic time estimates
+- Risk mitigation strategies
+- Progress checkpoints
+- Political science discipline-specific considerations`;
   }
 
   /**

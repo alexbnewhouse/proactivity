@@ -2302,16 +2302,62 @@ class ProjectDialogueModal extends Modal {
 
 	private async generatePlanWithoutTemplate(): Promise<void> {
 		this.questionContainer.empty();
-		this.questionContainer.createDiv({ 
-			text: 'Great! Generating your custom project plan...',
-			cls: 'ds-generating'
-		});
+		
+		// Create progress container
+		const progressContainer = this.questionContainer.createDiv({ cls: 'ds-generation-progress' });
+		progressContainer.createEl('h3', { text: '🤖 Generating Your Project Plan' });
+		
+		const statusContainer = progressContainer.createDiv({ cls: 'ds-progress-status' });
+		const progressBar = progressContainer.createDiv({ cls: 'ds-progress-bar-container' });
+		const progressFill = progressBar.createDiv({ cls: 'ds-progress-fill' });
+		
+		// Progress steps
+		const steps = [
+			'🔍 Analyzing your project requirements...',
+			'📚 Designing discipline-specific structure...',  
+			'⚡ Breaking down into micro-tasks...',
+			'🎯 Creating milestone checkpoints...',
+			'✨ Finalizing your personalized plan...'
+		];
+		
+		let currentStep = 0;
+		
+		const updateProgress = (stepIndex: number) => {
+			if (stepIndex < steps.length) {
+				statusContainer.textContent = steps[stepIndex];
+				const progressPercent = ((stepIndex + 1) / steps.length) * 100;
+				progressFill.style.width = `${progressPercent}%`;
+			}
+		};
+		
+		// Show initial step
+		updateProgress(currentStep);
+		
+		// Simulate progress during generation
+		const progressInterval = setInterval(() => {
+			if (currentStep < steps.length - 1) {
+				currentStep++;
+				updateProgress(currentStep);
+			}
+		}, 1500); // Update every 1.5 seconds
 
 		try {
 			const plan = await this.dialogueService.generateProjectPlan(this.currentSession.id);
+			
+			// Clear interval and show completion
+			clearInterval(progressInterval);
+			updateProgress(steps.length - 1);
+			
+			// Brief success message before closing
+			statusContainer.textContent = '✅ Plan generated successfully!';
+			progressFill.style.width = '100%';
+			
+			await new Promise(resolve => setTimeout(resolve, 1000)); // Show success briefly
+			
 			await this.onComplete(plan);
 			this.close();
 		} catch (error) {
+			clearInterval(progressInterval);
 			console.error('[Project Dialogue] Failed to generate plan:', error);
 			this.questionContainer.empty();
 			this.questionContainer.createEl('p', { 

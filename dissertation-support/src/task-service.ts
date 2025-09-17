@@ -45,6 +45,7 @@ export class TaskService {
   private app: AppInterface;
   private dailyTasks: DailyTasksRecord = {};
   private config: TaskBoardConfig;
+  private taskCounter: number = 0; // Counter to ensure unique IDs
 
   constructor(app: AppInterface, initialTasks: DailyTasksRecord = {}, config: Partial<TaskBoardConfig> = {}) {
     this.app = app;
@@ -70,6 +71,40 @@ export class TaskService {
 
     const today = this.getTodayKey();
     const list = this.ensureTodayTaskList();
+    
+    // Check for duplicates or very similar tasks
+    const isDuplicate = list.some(existingTask => {
+      const existingText = existingTask.text.toLowerCase();
+      const newText = cleanText.toLowerCase();
+      
+      // Exact match
+      if (existingText === newText) {
+        return true;
+      }
+      
+      // Similar tasks (high overlap in significant words)
+      const existingWords = existingText.split(/\W+/).filter(w => w.length > 3);
+      const newWords = newText.split(/\W+/).filter(w => w.length > 3);
+      
+      if (existingWords.length === 0 || newWords.length === 0) {
+        return false;
+      }
+      
+      const overlapCount = newWords.filter(word => existingWords.includes(word)).length;
+      const overlapRatio = overlapCount / Math.max(existingWords.length, newWords.length);
+      
+      return overlapRatio > 0.7; // 70% overlap threshold
+    });
+    
+    if (isDuplicate) {
+      console.warn(`[TaskService] Skipping duplicate task: ${cleanText}`);
+      // Return the existing similar task instead of creating a duplicate
+      const existingTask = list.find(task => 
+        task.text.toLowerCase().includes(cleanText.toLowerCase().split(' ')[0]) ||
+        cleanText.toLowerCase().includes(task.text.toLowerCase().split(' ')[0])
+      );
+      return existingTask || list[list.length - 1];
+    }
     
     // ADHD check: prevent overwhelm
     if (list.length >= this.config.maxTasksPerDay) {
@@ -453,7 +488,8 @@ ${markerEnd}`;
   }
 
   private generateTaskId(date: string): string {
-    return `${date}-${Math.random().toString(36).slice(2, 8)}`;
+    this.taskCounter++;
+    return `${date}-${this.taskCounter.toString().padStart(3, '0')}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
   private onTaskCompleted(task: MicroTask): void {

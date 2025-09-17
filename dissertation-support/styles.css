@@ -559,6 +559,77 @@ body.theme-dark .ds-resume-btn {
   transform: none;
 }
 
+/* Project Generation Progress Indicators */
+.ds-generation-progress {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.ds-generation-progress h3 {
+  color: var(--ds-text-color);
+  margin: 0 0 20px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.ds-progress-status {
+  color: var(--ds-text-muted-color);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+  min-height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: var(--ds-border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0 auto;
+  position: relative;
+}
+
+.ds-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ds-accent-blue), #4a7dd9);
+  width: 0%;
+  transition: width 0.5s ease-in-out;
+  border-radius: 4px;
+  position: relative;
+}
+
+.ds-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.3) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.3) 75%,
+    transparent 75%
+  );
+  background-size: 20px 20px;
+  animation: ds-progress-shimmer 2s linear infinite;
+}
+
+@keyframes ds-progress-shimmer {
+  0% {
+    background-position: -20px 0;
+  }
+  100% {
+    background-position: 20px 0;
+  }
+}
+
 .ds-generating {
   text-align: center;
   padding: 40px 20px;
