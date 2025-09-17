@@ -22,8 +22,15 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-        cache-dependency-path: dissertation-support/package-lock.json
+        
+    - name: Cache dissertation-support dependencies
+      uses: actions/cache@v3
+      with:
+        path: dissertation-support/node_modules
+        key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('dissertation-support/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-${{ matrix.node-version }}-
+          ${{ runner.os }}-node-
     
     - name: Install root dependencies
       run: |
