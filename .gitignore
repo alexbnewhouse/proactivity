@@ -12,6 +12,10 @@ main.js
 .DS_Store
 *.log
 
+# Database files
+*.db-shm
+*.db-wal
+
 # Obsidian
 .obsidian/
 

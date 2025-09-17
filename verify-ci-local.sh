@@ -43,7 +43,6 @@ echo "CHECK 2: Required files exist"
 required_files=(
     ".github/workflows/ci.yml"
     "src/backend/server.js" 
-    "src/browser-extension/manifest.json"
     "test-sync.sh"
     "test-integration-sync.sh"
     "package.json"
@@ -59,7 +58,7 @@ done
 
 echo "CHECK 3: JavaScript syntax validation"
 js_files_valid=true
-find src/browser-extension -name "*.js" -exec node -c {} \; 2>/dev/null || js_files_valid=false
+# Browser extension moved to archive - skipping JS syntax check
 find src/backend -name "*.js" -exec node -c {} \; 2>/dev/null || js_files_valid=false
 
 if [ "$js_files_valid" = true ]; then
@@ -94,18 +93,8 @@ else
     fail_check "No health check endpoint" "CI pipeline expects /health endpoint"
 fi
 
-echo "CHECK 7: Manifest.json validation"
-if command -v jq &> /dev/null; then
-    if jq . src/browser-extension/manifest.json > /dev/null 2>&1; then
-        pass_check "Browser extension manifest is valid JSON"
-    else
-        fail_check "Invalid manifest.json" "Fix JSON syntax errors"
-    fi
-elif python3 -c "import json; json.load(open('src/browser-extension/manifest.json'))" 2>/dev/null; then
-    pass_check "Browser extension manifest is valid JSON (Python validation)"
-else
-    fail_check "Cannot validate manifest.json" "Install jq or fix JSON syntax"
-fi
+echo "CHECK 7: Archive components validation (skipped)"
+pass_check "Browser extension moved to archive - validation skipped"
 
 echo "CHECK 8: Git ignore configuration"
 if grep -q "*.db-shm" .gitignore && grep -q "*.db-wal" .gitignore; then

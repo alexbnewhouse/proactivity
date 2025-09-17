@@ -102,10 +102,7 @@ jobs:
         fi
         cd ..
         
-        # Check browser extension files
-        if command -v node &> /dev/null; then
-          find src/browser-extension -name "*.js" -exec node -c {} \; 2>/dev/null || echo "Browser extension JS syntax check completed"
-        fi
+        # Browser extension moved to archive - skipping
         
         # Check backend files
         if command -v node &> /dev/null; then
@@ -200,16 +197,9 @@ jobs:
           fi
         done
     
-    - name: Validate browser extension manifest
+    - name: Validate archived components (skipped)
       run: |
-        if [ -f src/browser-extension/manifest.json ]; then
-          echo "Validating browser extension manifest..."
-          if command -v jq &> /dev/null; then
-            jq . src/browser-extension/manifest.json > /dev/null && echo "✅ Manifest is valid JSON" || echo "❌ Invalid manifest JSON"
-          else
-            python3 -m json.tool src/browser-extension/manifest.json > /dev/null && echo "✅ Manifest is valid JSON" || echo "❌ Invalid manifest JSON"
-          fi
-        fi
+        echo "Browser extension moved to archive - validation skipped"
     
     - name: Stop backend server
       if: always()
@@ -273,51 +263,10 @@ jobs:
           npm audit --audit-level=high || echo "⚠️ Dissertation support NPM audit completed with findings"
         fi
 
-  browser-extension-validation:
-    runs-on: ubuntu-latest
-    needs: lint-and-test
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Validate browser extension
-      run: |
-        echo "Validating browser extension structure..."
-        
-        # Check required files exist
-        required_files=("src/browser-extension/manifest.json" "src/browser-extension/background.js" "src/browser-extension/popup.html")
-        for file in "${required_files[@]}"; do
-          if [ -f "$file" ]; then
-            echo "✅ Found required file: $file"
-          else
-            echo "❌ Missing required file: $file"
-          fi
-        done
-        
-        # Validate manifest.json structure
-        if [ -f src/browser-extension/manifest.json ]; then
-          echo "Validating manifest structure..."
-          if command -v jq &> /dev/null; then
-            MANIFEST_VERSION=$(jq -r '.manifest_version' src/browser-extension/manifest.json)
-            NAME=$(jq -r '.name' src/browser-extension/manifest.json)
-            VERSION=$(jq -r '.version' src/browser-extension/manifest.json)
-            
-            echo "Manifest version: $MANIFEST_VERSION"
-            echo "Extension name: $NAME"
-            echo "Extension version: $VERSION"
-            
-            if [ "$MANIFEST_VERSION" = "3" ]; then
-              echo "✅ Using Manifest V3"
-            else
-              echo "⚠️  Not using Manifest V3 - consider upgrading"
-            fi
-          fi
-        fi
 
   deployment-ready:
     runs-on: ubuntu-latest
-    needs: [lint-and-test, security-scan, browser-extension-validation]
+    needs: [lint-and-test, security-scan]
     if: github.ref == 'refs/heads/main'
     
     steps:
@@ -335,8 +284,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "Components ready for deployment:" >> $GITHUB_STEP_SUMMARY
         echo "- 🌐 Backend API server" >> $GITHUB_STEP_SUMMARY
-        echo "- 🔌 Browser extension" >> $GITHUB_STEP_SUMMARY
-        echo "- 📝 Obsidian plugin" >> $GITHUB_STEP_SUMMARY
+        echo "-  Obsidian plugin" >> $GITHUB_STEP_SUMMARY
         echo "- 🔄 Sync system with conflict resolution" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "Commit: ${GITHUB_SHA}" >> $GITHUB_STEP_SUMMARY
