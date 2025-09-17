@@ -102,25 +102,46 @@ export class AIService {
     this.showProgressNotice('🤖 Generating delta update...');
     
     try {
-      const systemPrompt = 'You provide concise delta updates to an existing structured academic plan, focusing only on what changed and immediate next actions.';
       const basePrompt = this.buildPlanPrompt(planType, topic);
-      const deltaPrompt = `${basePrompt}\n\nYou previously generated a plan stored in file: ${previousPlan.file} on ${previousPlan.created}. Produce a DELTA UPDATE focusing on: 1) Adjusted timeline (if days remaining changed), 2) Top 5 next micro tasks, 3) Any risk shifts, 4) A concise recap table. Keep it short (< 800 tokens).`;
-      
+      const deltaPrompt = `${basePrompt}
+
+Previous plan created: ${previousPlan.created}
+File: ${previousPlan.file}
+
+Provide a DELTA UPDATE focusing on:
+1. Adjusted timeline (${previousPlan.daysRemaining} days remaining)
+2. Top 5 next micro-tasks
+3. Any risk shifts
+4. Concise recap
+
+Keep it short and actionable.`;
+
       const response = await this.makeRequest({
-        systemPrompt,
+        systemPrompt: 'You provide concise delta updates to existing structured academic plans, focusing on changes and immediate next actions.',
         userPrompt: deltaPrompt,
-        maxTokens: 1000, // Shorter for delta updates
-        temperature: 0.5, // Less creative for updates
+        maxTokens: 800,
+        temperature: 0.6,
       });
-      
-      this.showSuccessNotice('✅ Delta update generated!');
+
       return response.content;
-      
+
     } catch (error) {
-      console.error('[AIService] Delta generation failed:', error);
-      this.showErrorNotice('❌ Failed to generate delta update.');
-      
-      return this.getFallbackDelta(planType, previousPlan);
+      console.error('[AIService] Delta update failed:', error);
+      return this.getFallbackPlan(planType, topic);
+    }
+  }
+
+  /**
+   * General AI request method for other services
+   * ADHD-friendly: Consistent interface, graceful error handling
+   */
+  async requestAI(request: AIRequest): Promise<string> {
+    try {
+      const response = await this.makeRequest(request);
+      return response.content;
+    } catch (error) {
+      console.error('[AIService] AI request failed:', error);
+      throw new Error('AI request failed: ' + (error as Error).message);
     }
   }
 

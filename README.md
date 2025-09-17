@@ -17,14 +17,31 @@ The goal: reduce activation energy and preserve continuity between sessions.
 * Neutral, gentle tone (no shame, no gamified pressure)
 * Randomized phrasing to avoid alert fatigue
 
-### 🤖 One‑Time (or Periodic) AI Dissertation Plan
-* Breaks your topic into chapters → sections → micro‑tasks
-* Generates ADHD‑friendly next actions (5–25 minute granularity)
-* Suggests timeline scaffolding and milestone checkpoints
-* Saves everything as markdown so you own and can edit the output
+### 🤖 AI Planning (Dissertation & Prospectus)
+Two focused generators:
+* Dissertation Plan – full chapter / section scaffold + micro‑tasks
+* Prospectus Plan – scope clarification, required prospectus sections, early risk reduction
+Both include:
+* ADHD‑friendly micro actions (5–25 min granularity)
+* Deadline‑aware timeline (if you set a deadline / prospectus deadline)
+* Weekly milestone ladder & risk / mitigation table
+* Context preservation prompts to reduce restart friction
 
 ### 🧠 Micro‑Commitment Friendly
 Prompts emphasize tiny entry points (“open file”, “skim yesterday”, “add one sentence”) to defeat task initiation friction.
+
+### ✅ Daily Micro Task Board (New)
+Lightweight task board injected into today’s daily note:
+* Add ultra‑small (≤ 25 min) tasks via the “＋ Task” button or command palette (Add Micro Task)
+* Cycle status inline (todo → doing → done) with a single click
+* Drag to reorder; ordering persists for the day
+* Designed for activation, not backlog hoarding—each list is per‑day, intentionally ephemeral
+
+Tasks live inside plugin data (not cluttering your vault) but are rendered into the daily note using an HTML block bounded by markers:
+```
+<!-- ds-task-board:start --> ... <!-- ds-task-board:end -->
+```
+You can safely move that block elsewhere in the note; it will update in place.
 
 ### 🗂 100% Local Workflow
 * All data = markdown in your vault
@@ -56,9 +73,11 @@ If you use the BRAT plugin:
 ## Commands
 | Command | What It Does |
 | ------- | ------------- |
-| Plan my dissertation with AI | Generates a structured plan markdown file |
+| Plan my dissertation with AI | Generates a structured dissertation plan file |
+| Plan my prospectus with AI | Generates a prospectus‑focused scaffold & timeline |
 | Toggle proactive reminders | Enable / pause the hourly (or custom) nudges |
 | (Ribbon icon – brain) | Opens a quick action modal |
+| Add Micro Task | Quick modal to capture a tiny (≤25m) action |
 
 ---
 
@@ -69,7 +88,8 @@ If you use the BRAT plugin:
 | Proactive reminders toggle | Master on/off switch |
 | OpenAI API key | Used only for the planning command |
 | Dissertation topic | Feeds the AI prompt so it tailors structure |
-| Deadline | Adds timeline awareness to the plan |
+| Deadline | Dissertation target deadline (for timeline math) |
+| Prospectus Deadline | Separate earlier milestone if planning prospectus |
 
 All settings are stored locally inside the vault’s plugin data.
 

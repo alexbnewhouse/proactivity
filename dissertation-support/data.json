@@ -4,20 +4,30 @@
   "dissertationTopic": "Collective political behavior and epistemic collapse in online communities",
   "deadline": "May 2027",
   "prospectusDeadline": "December 2025",
-  "planOutputFolder": "",
-  "lastPlans": {},
+  "planOutputFolder": "Plans",
+  "targetWordCount": 100000,
+  "lastPlans": {
+    "prospectus": {
+      "file": "Plans/Prospectus Plan - 2025-09-17.md",
+      "created": "2025-09-17",
+      "daysRemaining": 75
+    }
+  },
   "lastReminderTime": 1758080813477,
   "isReminderActive": true,
   "notionStyleEnabled": true,
   "dailyTasks": {
-    "2025-09-16": []
+    "2025-09-16": [],
+    "2025-09-17": []
   },
   "tipsEnabled": true,
   "tipsDismissed": false,
   "lastTipDate": "2025-09-17",
-  "nextTipIndex": 4,
+  "nextTipIndex": 1,
   "tipFrequency": "daily",
-  "featureUsage": {},
+  "featureUsage": {
+    "createdPlan": true
+  },
   "hasSeenWelcome": true,
   "lastContext": {
     "title": "todos",

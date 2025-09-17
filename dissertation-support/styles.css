@@ -355,3 +355,152 @@ body.theme-dark .ds-resume-btn {
 .ds-task-hint { margin-top: 10px; font-size: 0.6rem; opacity: 0.6; }
 .ds-task-empty { font-size: 0.7rem; opacity: 0.7; padding: 4px 0 2px; }
 
+/* Project Dialogue Modal */
+.ds-project-dialogue {
+  max-width: 600px;
+  width: 90vw;
+}
+
+.ds-dialogue-intro {
+  color: var(--ds-text-muted-color);
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.ds-progress-container {
+  margin-bottom: 24px;
+}
+
+.ds-progress-label {
+  font-size: 0.8rem;
+  color: var(--ds-text-muted-color);
+  margin-bottom: 8px;
+}
+
+.ds-progress-bar {
+  height: 8px;
+  background: var(--ds-border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ds-progress-fill {
+  height: 100%;
+  background: var(--ds-accent-blue);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.ds-question-container {
+  min-height: 200px;
+}
+
+.ds-question h3 {
+  color: var(--ds-text-color);
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.ds-question-context {
+  color: var(--ds-text-muted-color);
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.ds-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.ds-choice-button {
+  padding: 12px 16px;
+  border: 1px solid var(--ds-border-color);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-bg-active);
+  color: var(--ds-text-color);
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.ds-choice-button:hover {
+  border-color: var(--ds-accent-blue);
+  background: rgba(91, 141, 239, 0.1);
+}
+
+.ds-choice-button.selected {
+  border-color: var(--ds-accent-blue);
+  background: rgba(91, 141, 239, 0.15);
+  color: var(--ds-accent-blue);
+  font-weight: 500;
+}
+
+.ds-text-input {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid var(--ds-border-color);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-bg-active);
+  color: var(--ds-text-color);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color var(--ds-transition);
+  margin-bottom: 20px;
+}
+
+.ds-text-input:focus {
+  border-color: var(--ds-accent-blue);
+  outline: none;
+}
+
+.ds-button-container {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ds-submit-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-accent-blue);
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all var(--ds-transition);
+}
+
+.ds-submit-button:hover:not(:disabled) {
+  background: #4a7dd9;
+  transform: translateY(-1px);
+}
+
+.ds-submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ds-generating {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--ds-text-muted-color);
+  font-size: 0.9rem;
+}
+
+.ds-error {
+  color: #e74c3c;
+  text-align: center;
+  padding: 20px;
+  font-size: 0.9rem;
+}
+

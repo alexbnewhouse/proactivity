@@ -5,6 +5,7 @@ import { StorageService } from './src/storage-service';
 import { AIService, AIProvider } from './src/ai-service';
 import { PlanningService } from './src/planning-service';
 import { TaskService } from './src/task-service';
+import { ProjectDialogueService } from './src/project-dialogue-service';
 import { validateSettings, Settings as ValidatedSettings } from './src/settings-schema';
 
 interface LastContext {
@@ -108,6 +109,7 @@ export default class DissertationSupportPlugin extends Plugin {
 	private aiService: AIService;
 	private planningService: PlanningService;
 	private taskService: TaskService;
+	private projectDialogueService: ProjectDialogueService;
 
 	async onload() {
 		await this.loadSettings();
@@ -211,6 +213,13 @@ export default class DissertationSupportPlugin extends Plugin {
 			id: 'show-onboarding-tip',
 			name: 'Show Onboarding Tip',
 			callback: () => this.showNextOnboardingTip(false)
+		});
+
+		// Command: Start New Project (AI Dialogue)
+		this.addCommand({
+			id: 'start-new-project',
+			name: 'Start New Project (AI Dialogue)',
+			callback: () => this.startNewProject()
 		});
 
 
@@ -538,6 +547,43 @@ export default class DissertationSupportPlugin extends Plugin {
 		return mt;
 	}
 
+	/**
+	 * Start new project using AI dialogue
+	 * ADHD-friendly: Guided conversation to break down project initiation
+	 */
+	async startNewProject(): Promise<void> {
+		if (!this.projectDialogueService) {
+			new Notice('⚠️ Project dialogue service not available. Check AI settings.');
+			return;
+		}
+
+		// Open the project dialogue modal
+		new ProjectDialogueModal(this.app, this.projectDialogueService, async (plan) => {
+			// Handle the completed project plan
+			if (plan) {
+				new Notice(`✅ Created project: ${plan.title} with ${plan.immediateNextSteps.length} next steps`);
+				
+				// Auto-generate micro-tasks from the plan
+				try {
+					const result = await this.projectDialogueService.createMicroTasksFromPlan('', plan);
+					if (result.tasksCreated > 0) {
+						new Notice(`📝 Generated ${result.tasksCreated} micro-tasks from your project plan`);
+						// Refresh task board in daily note
+						this.upsertTaskBoardInDailyNote(true);
+					}
+				} catch (error) {
+					console.error('[Project Creation] Failed to generate tasks:', error);
+					new Notice('⚠️ Project created, but task generation failed. You can add tasks manually.');
+				}
+
+				// Track feature usage
+				if (!this.settings.featureUsage) this.settings.featureUsage = {};
+				this.settings.featureUsage.createdPlan = true;
+				this.saveSettings();
+			}
+		}).open();
+	}
+
 	private extractMicroTasksFromContent(content: string, max: number = 8): string[] {
 		// Heuristic: capture bullet lines that start with - or * and have 6-120 chars
 		const lines = content.split(/\r?\n/);
@@ -738,6 +784,9 @@ export default class DissertationSupportPlugin extends Plugin {
 
 			// PlanningService: ADHD-friendly micro-task planning
 			this.planningService = new PlanningService(this.app, this.aiService);
+
+			// ProjectDialogueService: AI-driven project initiation dialogue
+			this.projectDialogueService = new ProjectDialogueService(this.aiService, this.taskService);
 
 			console.log('[ADHD Services] All services initialized successfully');
 
@@ -1649,6 +1698,211 @@ class OnboardingTipModal extends Modal {
 	}
 
 	onClose() { this.contentEl.empty(); }
+}
+
+class ProjectDialogueModal extends Modal {
+	private dialogueService: ProjectDialogueService;
+	private onComplete: (plan: any) => Promise<void>;
+	private currentSession: any = null;
+	private questionContainer: HTMLElement;
+	private progressBar: HTMLElement;
+	private submitButton: HTMLButtonElement;
+	private currentQuestion: any = null;
+
+	constructor(app: App, dialogueService: ProjectDialogueService, onComplete: (plan: any) => Promise<void>) {
+		super(app);
+		this.dialogueService = dialogueService;
+		this.onComplete = onComplete;
+	}
+
+	async onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('ds-focus-modal');
+		contentEl.addClass('ds-project-dialogue');
+		
+		// Header
+		contentEl.createEl('h2', { text: '🚀 Start New Project' });
+		contentEl.createDiv({ 
+			text: 'Let\'s break down your project into manageable steps through a quick conversation.',
+			cls: 'ds-dialogue-intro' 
+		});
+
+		// Progress bar
+		const progressContainer = contentEl.createDiv({ cls: 'ds-progress-container' });
+		progressContainer.createDiv({ text: 'Progress:', cls: 'ds-progress-label' });
+		this.progressBar = progressContainer.createDiv({ cls: 'ds-progress-bar' });
+		this.progressBar.createDiv({ cls: 'ds-progress-fill' });
+
+		// Question container
+		this.questionContainer = contentEl.createDiv({ cls: 'ds-question-container' });
+
+		// Start the dialogue
+		try {
+			this.currentSession = await this.dialogueService.startProjectDialogue();
+			await this.showNextQuestion();
+		} catch (error) {
+			this.questionContainer.createEl('p', { 
+				text: 'Sorry, there was an error starting the project dialogue. Please check your AI settings.',
+				cls: 'ds-error'
+			});
+			console.error('[Project Dialogue] Failed to start:', error);
+		}
+	}
+
+	private async showNextQuestion(): Promise<void> {
+		if (!this.currentSession) return;
+
+		// Update progress
+		const progress = this.dialogueService.getSessionProgress(this.currentSession.id);
+		if (progress) {
+			const progressFill = this.progressBar.querySelector('.ds-progress-fill') as HTMLElement;
+			if (progressFill) {
+				progressFill.style.width = `${progress.percentage}%`;
+			}
+			
+			const progressText = this.progressBar.parentElement?.querySelector('.ds-progress-label');
+			if (progressText) {
+				progressText.textContent = `Progress: ${progress.current}/${progress.total} (${progress.percentage}%)`;
+			}
+		}
+
+		// Get next question
+		try {
+			this.currentQuestion = this.dialogueService.getNextQuestion(this.currentSession.id);
+			if (!this.currentQuestion) {
+				await this.completeDialogue();
+				return;
+			}
+
+			// Clear previous question
+			this.questionContainer.empty();
+
+			// Show question
+			const questionEl = this.questionContainer.createDiv({ cls: 'ds-question' });
+			questionEl.createEl('h3', { text: this.currentQuestion.text });
+
+			if (this.currentQuestion.context) {
+				questionEl.createEl('p', { 
+					text: this.currentQuestion.context,
+					cls: 'ds-question-context'
+				});
+			}
+
+			// Create input based on question type
+			let inputEl: HTMLElement;
+			
+			if (this.currentQuestion.type === 'choice' && this.currentQuestion.choices) {
+				// Multiple choice
+				const choicesContainer = questionEl.createDiv({ cls: 'ds-choices' });
+				this.currentQuestion.choices.forEach((choice: string) => {
+					const choiceBtn = choicesContainer.createEl('button', { 
+						text: choice,
+						cls: 'ds-choice-button'
+					});
+					choiceBtn.addEventListener('click', () => {
+						// Highlight selected choice
+						choicesContainer.querySelectorAll('button').forEach(btn => btn.removeClass('selected'));
+						choiceBtn.addClass('selected');
+						if (this.submitButton) {
+							this.submitButton.disabled = false;
+						}
+					});
+				});
+				inputEl = choicesContainer;
+			} else {
+				// Text input
+				inputEl = questionEl.createEl('textarea', { 
+					placeholder: this.currentQuestion.placeholder || 'Your answer...',
+					cls: 'ds-text-input'
+				});
+				
+				inputEl.addEventListener('input', () => {
+					const value = (inputEl as HTMLTextAreaElement).value.trim();
+					if (this.submitButton) {
+						this.submitButton.disabled = value.length === 0;
+					}
+				});
+			}
+
+			// Submit button
+			const buttonContainer = this.questionContainer.createDiv({ cls: 'ds-button-container' });
+			this.submitButton = buttonContainer.createEl('button', {
+				text: 'Next',
+				cls: 'ds-submit-button'
+			});
+			this.submitButton.disabled = true;
+
+			this.submitButton.addEventListener('click', async () => {
+				let answer = '';
+				
+				if (this.currentQuestion.type === 'choice') {
+					const selectedChoice = this.questionContainer.querySelector('.ds-choice-button.selected');
+					answer = selectedChoice?.textContent || '';
+				} else {
+					answer = (inputEl as HTMLTextAreaElement).value.trim();
+				}
+
+				if (!answer) return;
+
+				try {
+					this.submitButton.disabled = true;
+					this.submitButton.textContent = 'Processing...';
+					
+					const result = await this.dialogueService.submitAnswer(
+						this.currentSession.id, 
+						this.currentQuestion.id, 
+						answer
+					);
+
+					if (result.isComplete) {
+						await this.completeDialogue();
+					} else {
+						await this.showNextQuestion();
+					}
+				} catch (error) {
+					console.error('[Project Dialogue] Failed to submit answer:', error);
+					this.submitButton.disabled = false;
+					this.submitButton.textContent = 'Next';
+					new Notice('Failed to submit answer. Please try again.');
+				}
+			});
+
+		} catch (error) {
+			console.error('[Project Dialogue] Failed to get next question:', error);
+			this.questionContainer.createEl('p', { 
+				text: 'Sorry, there was an error getting the next question.',
+				cls: 'ds-error'
+			});
+		}
+	}
+
+	private async completeDialogue(): Promise<void> {
+		if (!this.currentSession) return;
+
+		this.questionContainer.empty();
+		this.questionContainer.createDiv({ 
+			text: 'Great! Generating your project plan...',
+			cls: 'ds-generating'
+		});
+
+		try {
+			const plan = await this.dialogueService.generateProjectPlan(this.currentSession.id);
+			await this.onComplete(plan);
+			this.close();
+		} catch (error) {
+			console.error('[Project Dialogue] Failed to generate plan:', error);
+			this.questionContainer.empty();
+			this.questionContainer.createEl('p', { 
+				text: 'Sorry, there was an error generating your project plan. Please try again.',
+				cls: 'ds-error'
+			});
+		}
+	}
+
+	onClose() { 
+		this.contentEl.empty(); 
+	}
 }
 
 // --- Utilities ---

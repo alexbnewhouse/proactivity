@@ -28,8 +28,8 @@ export const createMockPlugin = () => ({
     },
   },
   addCommand: jest.fn(),
-  loadData: jest.fn().mockResolvedValue({}),
-  saveData: jest.fn().mockResolvedValue(undefined),
+  loadData: jest.fn().mockImplementation(() => Promise.resolve({})),
+  saveData: jest.fn().mockImplementation(() => Promise.resolve()),
 });
 
 // Quick assertion helpers for ADHD developers
