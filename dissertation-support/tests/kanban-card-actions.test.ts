@@ -9,11 +9,11 @@ import DissertationSupportPlugin from '../main';
 const mockApp = {
     workspace: {
         getLeaf: jest.fn(() => ({
-            openFile: jest.fn().mockResolvedValue(null as any)
+            openFile: jest.fn().mockResolvedValue(null as never)
         }))
     },
     vault: {
-        create: jest.fn().mockResolvedValue({ path: 'test.md' } as any),
+        create: jest.fn().mockResolvedValue({ path: 'test.md' } as never),
         getAbstractFileByPath: jest.fn().mockReturnValue(null)
     }
 } as unknown as App;

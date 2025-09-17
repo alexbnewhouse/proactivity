@@ -64,11 +64,11 @@ describe('Kanban Card Button Actions (Unit Tests)', () => {
         const mockApp = {
             workspace: {
                 getLeaf: () => ({
-                    openFile: jest.fn().mockResolvedValue(undefined as any)
+                    openFile: jest.fn().mockResolvedValue(undefined as never)
                 })
             },
             vault: {
-                create: jest.fn().mockResolvedValue({ path: 'test.md' } as any),
+                create: jest.fn().mockResolvedValue({ path: 'test.md' } as never),
                 getAbstractFileByPath: jest.fn().mockReturnValue(null)
             }
         };
