@@ -2,6 +2,57 @@
 
 All notable changes to the Dissertation Support plugin will be documented in this file.
 
+## [2.2.0] - 2024-12-20
+
+### ✨ Latest Enhancements
+
+#### UX & Onboarding Improvements
+- **One-Time API Key Prompts**: New users are prompted to add API key on first project creation, with option to skip to local mode
+- **Streamlined Interface**: Removed popup tips system in favor of comprehensive Welcome Guide with ADHD-specific tips
+- **Enhanced Settings Flag**: Added tracking to prevent repeated API key prompts per session
+
+#### Session Tracking & Analytics (NEW!)
+- **Work Pattern Monitoring**: Track session duration, tasks completed, and productivity metrics
+- **Hyperfocus Detection**: Gentle break reminders during extended work sessions (configurable intervals)
+- **Session Analytics View**: New dedicated view for visualizing work patterns over time
+- **ADHD-Friendly Insights**: Non-judgmental break suggestions with customizable timing
+
+#### Kanban Board Management
+- **Board Settings Panel**: Full board management with rename and delete functionality  
+- **Enhanced Board Persistence**: Improved board state restoration and management
+- **Settings Integration**: Board operations properly integrated with confirmation modals
+
+#### Quick Capture & Content Routing (NEW!)
+- **Intelligent Quick Capture**: Smart content categorization for rapid idea capture
+- **Automatic Content Routing**: Routes captured content to appropriate project contexts
+- **Multiple Content Types**: Handles tasks, ideas, research notes, and more
+- **Context-Aware Processing**: Understands current project context for better organization
+
+#### Comprehensive Testing Suite
+- **Session Tracking Tests**: 10 comprehensive tests covering metrics, hyperfocus detection, break management
+- **Quick Capture Tests**: 11 tests for content categorization and routing logic  
+- **Enhanced Test Coverage**: 21 total new tests ensuring reliability of new features
+
+### 🛠️ Technical Improvements
+- **Clean Code Architecture**: Removed legacy tips system while preserving welcome page functionality
+- **Enhanced Service Integration**: Better separation of concerns between tracking, capture, and management services
+- **Improved Error Handling**: More robust error handling for new features
+- **TypeScript Enhancements**: Updated interfaces and type safety for new functionality
+
+### 🔧 Bug Fixes
+- Fixed TypeScript compilation issues after interface changes
+- Resolved Kanban board settings button functionality
+- Enhanced API key validation and storage
+- Improved service initialization reliability
+
+### 📚 Documentation Updates
+- **README Enhancements**: Updated both main and plugin README files with latest features
+- **Feature Documentation**: Comprehensive documentation of new session tracking and quick capture features
+- **Setup Guide Updates**: Revised installation and setup instructions for new API key flow
+- **Settings Documentation**: Updated configuration tables with new session tracking options
+
+---
+
 ## [2.1.0] - 2024-12-19
 
 ### 🚀 Major Enhancements

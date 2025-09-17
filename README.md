@@ -21,7 +21,7 @@ The goal: reduce activation energy and maintain continuity in your academic work
 
 ---
 
-## ✨ Core Features (Phase 2 Complete)
+## ✨ Core Features (Phase 2 Complete + Latest Enhancements)
 
 ### 🤖 AI Project Initiation Dialogue (ENHANCED!)
 **Stop staring at blank pages.** A conversational AI guide asks 5-7 targeted questions about your project, then generates a structured plan with immediate next steps.
@@ -33,7 +33,41 @@ The goal: reduce activation energy and maintain continuity in your academic work
 - Generates immediately actionable tasks
 - **NEW**: Automatic dissertation planning for dissertation projects
 - **NEW**: Seamless integration with Kanban boards
-- **NEW**: Smart project context detection and API key management
+- **NEW**: One-time API key prompts for seamless onboarding
+- **NEW**: Smart project context detection and local mode fallback
+
+### 📊 Project Kanban Boards (ENHANCED!)
+**Visual project management** with full interactive functionality and board management:
+
+- 🎨 **Drag-and-drop interface** for moving tasks between project phases
+- ⚡ **Energy-aware task organization** - match tasks to your current energy level
+- ⏱️ **ADHD-friendly time estimation** with optimistic/realistic/pessimistic ranges
+- 📈 **Visual progress tracking** with completion percentages and subtask breakdown
+- 🚦 **WIP limits** to prevent overwhelm
+- 🎯 **Focus views** to reduce cognitive load
+- ✅ **Interactive card actions** - edit, complete, link to notes, and delete cards
+- 🔗 **Smart project integration** - boards created from project dialogue appear instantly
+- ⚙️ **NEW**: Full board management with settings panel for rename/delete operations
+- 🔄 **NEW**: Enhanced board persistence and restoration
+
+### 📊 Session Tracking & Analytics (NEW!)
+**Monitor your work patterns and build self-awareness** about your productivity:
+
+- 📈 **Work session metrics** - track duration, tasks completed, and productivity patterns
+- 🧠 **Hyperfocus detection** - gentle break reminders during extended work sessions  
+- ⏰ **Configurable break intervals** - customize when you want gentle nudges to take breaks
+- 📊 **Session analytics view** - visualize your work patterns over time
+- 🎯 **ADHD-friendly insights** - understand your peak productivity periods
+- 💙 **Gentle reminder language** - non-judgmental, supportive break suggestions
+
+### ⚡ Quick Capture Modal (NEW!)
+**Rapid idea capture with intelligent content routing**:
+
+- 🚀 **Instant capture** - quickly jot down ideas without losing focus
+- 🤖 **Smart categorization** - automatically routes content to appropriate project areas
+- 📝 **Multiple content types** - handles tasks, ideas, research notes, and more
+- 🎯 **Context-aware routing** - understands your current project context
+- ⚡ **Minimal friction** - designed for immediate capture and processing
 
 ### 📋 Academic Project Templates (6 Pre-Built)
 **Pre-structured academic workflows** designed specifically for neurodivergent minds:
@@ -103,23 +137,23 @@ The goal: reduce activation energy and maintain continuity in your academic work
 3. **Enable**: Go to Settings → Community Plugins → Enable "Dissertation Support"
 
 ### 5-Minute Setup
-1. **Configure Settings**: Settings → Dissertation Support
-   - Add OpenAI API Key (required for AI features)
+1. **Configure Basic Settings**: Settings → Dissertation Support
    - Set your dissertation topic (optional - can be set during project creation)
-   - Configure reminder interval (default: 60 minutes)
+   - Configure reminder interval and session tracking preferences (default: 60 minutes, 45-minute break intervals)
    
 2. **Start Your First Project**: 
    - Click the 🧠 brain icon in the ribbon
    - Select "Start New Project"
+   - **NEW**: First time users will be prompted to add an OpenAI API key for AI features, or can skip to local mode
    - Follow the AI dialogue (5-7 questions)
    - **NEW**: For dissertation projects, AI planning triggers automatically!
    - Choose an academic template and watch your Kanban board populate
    
 3. **Build Momentum**:
    - Open the Project Kanban Board (auto-updates with new projects)
-   - Use interactive card buttons to edit, complete, and manage tasks
+   - Use interactive card buttons and board settings to manage tasks
    - Focus on just 2-3 tasks today
-   - Let proactive reminders keep you on track
+   - Let proactive reminders and session tracking keep you on track
 
 ---
 
@@ -141,11 +175,12 @@ The goal: reduce activation energy and maintain continuity in your academic work
 ### Main Commands
 | Command | What It Does |
 |---------|--------------|
-| **Start New Project** | Launch AI dialogue for project planning |
-| **Show Project Kanban Board** | Open visual project management |
-| **Show Welcome Guide** | Access comprehensive feature guide |
+| **Start New Project** | Launch AI dialogue for project planning with API key setup |
+| **Show Project Kanban Board** | Open visual project management with board settings |
+| **Show Session Analytics** | View work patterns, hyperfocus tracking, and productivity insights |
+| **Show Welcome Guide** | Access comprehensive feature guide with ADHD tips |
 | **Plan my dissertation with AI** | Generate structured dissertation plan (auto-created for dissertation projects) |
-| **Add Micro Task** | Quick capture for 5-25 minute tasks |
+| **Add Micro Task** | Quick capture with intelligent categorization |
 | **Toggle reminders** | Enable/disable proactive nudges |
 
 ### Accessing Features
@@ -161,12 +196,14 @@ The goal: reduce activation energy and maintain continuity in your academic work
 ### Settings Overview
 | Setting | Purpose | Default |
 |---------|---------|---------|
-| **OpenAI API Key** | Required for AI planning features | (empty) |
+| **OpenAI API Key** | Required for AI planning features (prompted on first project creation) | (empty) |
 | **Dissertation Topic** | Context for AI planning | (empty) |
 | **Deadline** | Enables timeline calculations | (empty) |
 | **Target Word Count** | For pacing suggestions | (empty) |
 | **Reminder Interval** | Minutes between gentle nudges | 60 |
+| **Session Break Interval** | Minutes between break suggestions during work | 45 |
 | **Plan Output Folder** | Where AI generates plans | (vault root) |
+| **Session Tracking** | Enable work pattern monitoring and hyperfocus detection | Enabled |
 
 ### Privacy & Data
 - 🔒 **API Key**: Stored locally only, never shared
@@ -184,13 +221,17 @@ The goal: reduce activation energy and maintain continuity in your academic work
 - Simple AI planning
 - Micro-task management
 
-### ✅ Phase 2: ADHD-Optimized Features (Complete)
+### ✅ Phase 2: ADHD-Optimized Features (Complete + Latest Enhancements)
 - AI Project Initiation Dialogue with smart project detection
 - Academic Project Templates (6 pre-built)
-- Interactive Visual Kanban Boards with full card management
-- Enhanced Welcome Guide and comprehensive testing
+- Interactive Visual Kanban Boards with full card and board management
+- Enhanced Welcome Guide and comprehensive testing suite
 - Context preservation and seamless project integration
 - Automatic AI planning for dissertation projects
+- **NEW**: Session tracking and analytics with hyperfocus detection
+- **NEW**: Quick capture modal with intelligent content routing
+- **NEW**: One-time API key prompts for seamless onboarding
+- **NEW**: Streamlined UX with welcome guide replacing popup tips
 
 ### 🔄 Phase 3: Advanced Academic Features (In Progress)
 - Citation management integration

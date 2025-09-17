@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, Notice } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFile, Notice, App, Modal } from 'obsidian';
 import { KanbanBoard, KanbanCard, KanbanColumn } from './kanban-service';
 import { CardEditModal } from './card-edit-modal';
 import DissertationSupportPlugin from '../main';
@@ -63,6 +63,10 @@ export class KanbanView extends ItemView {
 		const settingsBtn = toolbar.createEl('button', {
 			text: '⚙️',
 			cls: 'kanban-btn kanban-btn-secondary'
+		});
+
+		settingsBtn.addEventListener('click', () => {
+			this.showBoardSettings();
 		});
 
 		// Board container
@@ -846,8 +850,185 @@ ${card.focusNotes || ''}
 		}
 	}
 
+	private showBoardSettings() {
+		if (!this.currentBoard) {
+			new Notice('No board selected');
+			return;
+		}
+
+		// Create a simple modal for board settings
+		const modal = new BoardSettingsModal(this.app, this.currentBoard, (action, data) => {
+			if (action === 'rename' && data) {
+				this.currentBoard!.title = data.name;
+				this.plugin.projectKanbanService.saveBoard(this.currentBoard!);
+				this.populateBoardSelector(this.boardSelector!);
+				this.renderBoard();
+				new Notice(`Board renamed to "${data.name}"`);
+			} else if (action === 'delete') {
+				this.deleteCurrentBoard();
+			}
+		});
+		modal.open();
+	}
+
+	private async deleteCurrentBoard() {
+		if (!this.currentBoard) return;
+
+		const boardName = this.currentBoard.title;
+		
+		// Confirm deletion
+		const confirmed = await this.showConfirmDialog(
+			'Delete Board',
+			`Are you sure you want to delete "${boardName}"? This action cannot be undone.`
+		);
+
+		if (confirmed) {
+			this.plugin.projectKanbanService.deleteBoard(this.currentBoard.id);
+			this.currentBoard = null;
+			this.populateBoardSelector(this.boardSelector!);
+			
+			// Show empty state
+			const boardContainer = this.containerEl.querySelector('.kanban-board') as HTMLElement;
+			if (boardContainer) {
+				this.showEmptyState(boardContainer);
+			}
+			
+			new Notice(`Board "${boardName}" deleted`);
+		}
+	}
+
+	private showConfirmDialog(title: string, message: string): Promise<boolean> {
+		return new Promise((resolve) => {
+			const modal = new ConfirmModal(this.app, title, message, resolve);
+			modal.open();
+		});
+	}
+
 	async onClose() {
 		// Save current board state
 		// TODO: Implement board persistence
+	}
+}
+
+// Simple modal classes for board management
+class BoardSettingsModal extends Modal {
+	board: KanbanBoard;
+	callback: (action: string, data?: any) => void;
+
+	constructor(app: App, board: KanbanBoard, callback: (action: string, data?: any) => void) {
+		super(app);
+		this.board = board;
+		this.callback = callback;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('board-settings-modal');
+
+		contentEl.createEl('h2', { text: 'Board Settings' });
+
+		// Rename section
+		const renameSection = contentEl.createDiv('setting-section');
+		renameSection.createEl('h3', { text: 'Rename Board' });
+		
+		const inputContainer = renameSection.createDiv('input-container');
+		const nameInput = inputContainer.createEl('input', { 
+			type: 'text',
+			value: this.board.title,
+			placeholder: 'Board name'
+		});
+
+		const renameBtn = inputContainer.createEl('button', {
+			text: 'Rename',
+			cls: 'mod-cta'
+		});
+
+		renameBtn.onclick = () => {
+			const newName = nameInput.value.trim();
+			if (newName && newName !== this.board.title) {
+				this.callback('rename', { name: newName });
+				this.close();
+			}
+		};
+
+		// Delete section
+		const deleteSection = contentEl.createDiv('setting-section danger-section');
+		deleteSection.createEl('h3', { text: 'Danger Zone' });
+		deleteSection.createEl('p', { 
+			text: 'Deleting a board is permanent and cannot be undone.',
+			cls: 'setting-description'
+		});
+
+		const deleteBtn = deleteSection.createEl('button', {
+			text: 'Delete Board',
+			cls: 'mod-warning'
+		});
+
+		deleteBtn.onclick = () => {
+			this.callback('delete');
+			this.close();
+		};
+
+		// Handle Enter key on input
+		nameInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				renameBtn.click();
+			}
+		});
+
+		// Focus input
+		nameInput.focus();
+		nameInput.select();
+	}
+}
+
+class ConfirmModal extends Modal {
+	title: string;
+	message: string;
+	callback: (confirmed: boolean) => void;
+
+	constructor(app: App, title: string, message: string, callback: (confirmed: boolean) => void) {
+		super(app);
+		this.title = title;
+		this.message = message;
+		this.callback = callback;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('confirm-modal');
+
+		contentEl.createEl('h2', { text: this.title });
+		contentEl.createEl('p', { text: this.message });
+
+		const buttonContainer = contentEl.createDiv('modal-button-container');
+		
+		const cancelBtn = buttonContainer.createEl('button', {
+			text: 'Cancel'
+		});
+
+		const confirmBtn = buttonContainer.createEl('button', {
+			text: 'Confirm',
+			cls: 'mod-warning'
+		});
+
+		cancelBtn.onclick = () => {
+			this.callback(false);
+			this.close();
+		};
+
+		confirmBtn.onclick = () => {
+			this.callback(true);
+			this.close();
+		};
+
+		// Handle Escape key
+		this.contentEl.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') {
+				cancelBtn.click();
+			}
+		});
 	}
 }

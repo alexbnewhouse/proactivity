@@ -10,6 +10,9 @@ import { AcademicTemplateService } from './src/academic-templates';
 import { ProjectKanbanService } from './src/kanban-service';
 import { validateSettings, Settings as ValidatedSettings } from './src/settings-schema';
 import { KanbanView, KANBAN_VIEW_TYPE } from './src/kanban-view';
+import { QuickCaptureModal } from './src/quick-capture-modal';
+import { SessionTrackingService } from './src/session-tracking-service';
+import { SessionAnalyticsView, SESSION_ANALYTICS_VIEW_TYPE } from './src/session-analytics-view';
 
 interface LastContext {
 	title: string; // brief description or heading user was working on
@@ -65,12 +68,6 @@ interface DissertationSupportSettings {
 	notionStyleEnabled: boolean; // enable enhanced Notion-like styling
 	lastDailyPlan?: DailyPlan; // auto-generated daily focus
   dailyTasks?: DailyTasksRecord; // micro-task board keyed by date
-  // Onboarding tips
-  tipsEnabled?: boolean; // master toggle for rotating tips
-  tipsDismissed?: boolean; // permanently disabled by user
-  lastTipDate?: string; // YYYY-MM-DD last auto-shown date
-  nextTipIndex?: number; // index into tip array
-	tipFrequency?: 'daily' | 'every-launch' | 'manual'; // when to auto show
 	firstRunCompleted?: boolean; // track if user has seen welcome guide
 	featureUsage?: {
 		savedContext?: boolean;
@@ -82,6 +79,13 @@ interface DissertationSupportSettings {
 		toggledReminders?: boolean;
 	};
 	lastOpenedBoardId?: string; // Remember last Kanban board
+	// Session tracking settings
+	sessionBreakInterval?: number; // minutes between break suggestions
+	enableBreakReminders?: boolean; // enable/disable break reminder notifications
+	enableHyperfocusDetection?: boolean; // detect and notify about hyperfocus episodes
+	gentleSessionReminders?: boolean; // use gentle, non-disruptive reminder language
+	// API key prompt tracking
+	hasPromptedForApiKey?: boolean; // track if user has been prompted for API key during project creation
 }
 
 const DEFAULT_SETTINGS: DissertationSupportSettings = {
@@ -97,14 +101,15 @@ const DEFAULT_SETTINGS: DissertationSupportSettings = {
 	isReminderActive: true,
 	notionStyleEnabled: true,
 	dailyTasks: {},
-  tipsEnabled: true,
-  tipsDismissed: false,
-  lastTipDate: '',
-  nextTipIndex: 0,
-	tipFrequency: 'daily',
 	firstRunCompleted: false,
 	featureUsage: {},
 	lastOpenedBoardId: '',
+	// Session tracking defaults
+	sessionBreakInterval: 45,
+	enableBreakReminders: true,
+	enableHyperfocusDetection: true,
+	gentleSessionReminders: true,
+	hasPromptedForApiKey: false,
 }
 
 export default class DissertationSupportPlugin extends Plugin {
@@ -119,6 +124,7 @@ export default class DissertationSupportPlugin extends Plugin {
 	private projectDialogueService: ProjectDialogueService;
 	private academicTemplateService: AcademicTemplateService;
 	public projectKanbanService: ProjectKanbanService;
+	private sessionTrackingService: SessionTrackingService;
 
 	async onload() {
 		await this.loadSettings();
@@ -135,6 +141,12 @@ export default class DissertationSupportPlugin extends Plugin {
 			(leaf) => new KanbanView(leaf, this)
 		);
 
+		// Register the session analytics view
+		this.registerView(
+			SESSION_ANALYTICS_VIEW_TYPE,
+			(leaf) => new SessionAnalyticsView(leaf, this.sessionTrackingService)
+		);
+
 		// Stylesheet is static (styles.css) and auto-loaded by Obsidian when present.
 
 		// Add ribbon icon
@@ -146,7 +158,9 @@ export default class DissertationSupportPlugin extends Plugin {
 		this.addCommand({
 			id: 'ai-plan-dissertation',
 			name: 'Plan my dissertation with AI',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'p' }],
 			callback: () => {
+				this.sessionTrackingService?.recordInteraction('AI Planning');
 				this.runAIPlanning('dissertation');
 			}
 		});
@@ -176,6 +190,7 @@ export default class DissertationSupportPlugin extends Plugin {
 		this.addCommand({
 			id: 'show-today-focus-panel',
 			name: "Show Today's Focus Panel",
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'f' }],
 			callback: () => {
 				this.ensureTodayPlan();
 				this.showFocusPanel();
@@ -204,7 +219,9 @@ export default class DissertationSupportPlugin extends Plugin {
 		this.addCommand({
 			id: 'show-kanban-board',
 			name: 'Show Project Kanban Board',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'k' }],
 			callback: async () => {
+				this.sessionTrackingService?.recordInteraction('Kanban Board');
 				await this.activateKanbanView();
 			}
 		});
@@ -213,6 +230,7 @@ export default class DissertationSupportPlugin extends Plugin {
 		this.addCommand({
 			id: 'start-new-project',
 			name: 'Start New Project',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'n' }],
 			callback: () => {
 				this.startNewProject();
 			}
@@ -232,6 +250,7 @@ export default class DissertationSupportPlugin extends Plugin {
 		this.addCommand({
 			id: 'save-current-dissertation-context',
 			name: 'Save Current Dissertation Context',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 's' }],
 			callback: () => {
 				this.captureCurrentContext();
 			}
@@ -241,7 +260,9 @@ export default class DissertationSupportPlugin extends Plugin {
 		this.addCommand({
 			id: 'add-micro-task',
 			name: 'Add Micro Task',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 't' }],
 			callback: () => {
+				this.sessionTrackingService?.recordInteraction('Add Task');
 				new AddMicroTaskModal(this.app, this, (text) => {
 					this.createMicroTask(text);
 					this.upsertTaskBoardInDailyNote(true);
@@ -256,18 +277,34 @@ export default class DissertationSupportPlugin extends Plugin {
 			callback: () => this.seedMicroTasksFromLastPlan()
 		});
 
-		// Command: Show onboarding tip
-		this.addCommand({
-			id: 'show-onboarding-tip',
-			name: 'Show Onboarding Tip',
-			callback: () => this.showNextOnboardingTip(false)
-		});
-
 		// Command: Start New Project (AI Dialogue)
 		this.addCommand({
 			id: 'start-new-project',
 			name: 'Start New Project (AI Dialogue)',
 			callback: () => this.startNewProject()
+		});
+
+		// Command: Quick Capture
+		this.addCommand({
+			id: 'quick-capture',
+			name: 'Quick Capture',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'c' }],
+			callback: () => {
+				this.sessionTrackingService?.recordInteraction('Quick Capture');
+				const modal = new QuickCaptureModal(this.app, this);
+				modal.open();
+			}
+		});
+
+		// Command: Session Analytics
+		this.addCommand({
+			id: 'show-session-analytics',
+			name: 'Show Session Analytics',
+			hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'a' }],
+			callback: async () => {
+				this.sessionTrackingService?.recordInteraction('Session Analytics');
+				await this.activateSessionAnalyticsView();
+			}
 		});
 
 
@@ -284,9 +321,6 @@ export default class DissertationSupportPlugin extends Plugin {
 
 		// Status bar item
 		this.initStatusBar();
-
-		// Auto show one tip per day after initial UI setup
-		this.showNextOnboardingTip(true);
 
 		// Markdown post processor for resume card interactions
 		this.registerMarkdownPostProcessor((el, ctx) => {
@@ -471,6 +505,30 @@ export default class DissertationSupportPlugin extends Plugin {
 			leaf = workspace.getRightLeaf(false);
 			if (leaf) {
 				await leaf.setViewState({ type: KANBAN_VIEW_TYPE, active: true });
+			}
+		}
+
+		// Reveal the leaf
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	/** Activate the Session Analytics view in the sidebar */
+	async activateSessionAnalyticsView(): Promise<void> {
+		const { workspace } = this.app;
+
+		let leaf: WorkspaceLeaf | null = null;
+		const leaves = workspace.getLeavesOfType(SESSION_ANALYTICS_VIEW_TYPE);
+
+		if (leaves.length > 0) {
+			// A session analytics view already exists, use it
+			leaf = leaves[0];
+		} else {
+			// Create a new session analytics view in the right sidebar
+			leaf = workspace.getRightLeaf(false);
+			if (leaf) {
+				await leaf.setViewState({ type: SESSION_ANALYTICS_VIEW_TYPE, active: true });
 			}
 		}
 
@@ -667,6 +725,30 @@ export default class DissertationSupportPlugin extends Plugin {
 			return;
 		}
 
+		// Check if we need to prompt for API key (only once per session)
+		if (!this.settings.hasPromptedForApiKey && !this.settings.openaiApiKey?.trim()) {
+			this.settings.hasPromptedForApiKey = true;
+			await this.saveSettings();
+			
+			// Show API key prompt
+			new ApiKeyPromptModal(this.app, this, (hasApiKey) => {
+				if (hasApiKey) {
+					// Continue with AI-powered project creation
+					this.openProjectDialogue();
+				} else {
+					// Continue with local/basic project creation
+					new Notice('💡 Creating project in local mode. You can add an API key in settings later for AI features.');
+					this.openProjectDialogue();
+				}
+			}).open();
+			return;
+		}
+
+		// Open the project dialogue modal directly
+		this.openProjectDialogue();
+	}
+
+	private openProjectDialogue(): void {
 		// Open the project dialogue modal
 		new ProjectDialogueModal(this.app, this.projectDialogueService, async (plan) => {
 			// Handle the completed project plan
@@ -885,6 +967,7 @@ export default class DissertationSupportPlugin extends Plugin {
 
 	onunload() {
 		this.stopProactiveReminders();
+		this.sessionTrackingService?.destroy();
 		console.log('Dissertation Support Plugin unloaded');
 	}
 
@@ -895,13 +978,7 @@ export default class DissertationSupportPlugin extends Plugin {
 		if (this.settings.prospectusDeadline === undefined) this.settings.prospectusDeadline = '';
 		if (this.settings.planOutputFolder === undefined) this.settings.planOutputFolder = '';
 		if (this.settings.lastPlans === undefined) this.settings.lastPlans = {};
-		// Tips migrations
-		if (this.settings.tipsEnabled === undefined) this.settings.tipsEnabled = true;
-		if (this.settings.tipsDismissed === undefined) this.settings.tipsDismissed = false;
-		if (this.settings.lastTipDate === undefined) this.settings.lastTipDate = '';
-		if (this.settings.nextTipIndex === undefined) this.settings.nextTipIndex = 0;
 		if (!this.settings.featureUsage) this.settings.featureUsage = {};
-		if (!this.settings.tipFrequency) this.settings.tipFrequency = 'daily';
 
 		// Initialize ADHD-friendly services with dependency injection
 		await this.initializeServices();
@@ -955,6 +1032,14 @@ export default class DissertationSupportPlugin extends Plugin {
 				this.academicTemplateService,
 				this.projectKanbanService
 			);
+
+			// SessionTrackingService: ADHD-friendly session monitoring and break reminders
+			this.sessionTrackingService = new SessionTrackingService(this.app, {
+				suggestedBreakInterval: this.settings.sessionBreakInterval || 45,
+				breakReminderEnabled: this.settings.enableBreakReminders !== false,
+				hyperfocusDetectionEnabled: this.settings.enableHyperfocusDetection !== false,
+				gentleReminders: this.settings.gentleSessionReminders !== false
+			});
 
 			console.log('[ADHD Services] All services initialized successfully');
 
@@ -1123,58 +1208,7 @@ export default class DissertationSupportPlugin extends Plugin {
 		modal.open();
 	}
 
-	// ---------- Onboarding Tips (Enhanced) ----------
-	private getOnboardingTips(): { text: string; condition?: (p: DissertationSupportPlugin)=>boolean }[] {
-		return [
-			{ text: 'Use "Save Current Dissertation Context" before stopping – resume instantly later.', condition: p => !p.settings.featureUsage?.savedContext },
-			{ text: 'Break work into ≤ 25 min micro tasks. Use "Add Micro Task" to capture one.', condition: p => !p.settings.featureUsage?.createdMicroTask },
-			{ text: 'Open a generated plan then click "Seed top bullets as micro tasks" to populate today\'s board.', condition: p => (p.settings.featureUsage?.createdPlan && !p.settings.featureUsage?.seededFromPlan) },
-			{ text: 'Generate a dissertation or prospectus plan with AI to scaffold structure.', condition: p => !p.settings.featureUsage?.createdPlan },
-			{ text: 'Click "Generate delta update" inside a plan to get concise changes & next steps.', condition: p => p.settings.featureUsage?.createdPlan && !p.settings.featureUsage?.createdDelta },
-			{ text: 'Open "Show Today\'s Focus Panel" and set a first action + planned stop—helps reduce friction.', condition: p => !p.settings.featureUsage?.openedFocusPanel },
-			{ text: 'Insert the Resume Card into today\'s note after saving context to jump back instantly.', condition: p => p.settings.featureUsage?.savedContext && p.settings.notionStyleEnabled },
-			{ text: 'Set a Plan Output Folder in settings to keep AI plans organized.', condition: p => !p.settings.planOutputFolder },
-			{ text: 'Adjust the Reminder Interval or pause reminders if nudges feel too frequent.', condition: p => !p.settings.featureUsage?.toggledReminders },
-			{ text: 'Use a separate Prospectus deadline to shape early-stage scoping.', condition: p => !p.settings.prospectusDeadline },
-			{ text: 'Toggle the Notion-like style in settings if you prefer simpler visuals.' },
-		];
-	}
 
-	showNextOnboardingTip(auto: boolean = false) {
-		if (!this.settings.tipsEnabled || this.settings.tipsDismissed) return;
-		const today = new Date().toISOString().split('T')[0];
-		// frequency gating
-		if (auto) {
-			if (this.settings.tipFrequency === 'daily' && this.settings.lastTipDate === today) return;
-			if (this.settings.tipFrequency === 'manual') return; // never auto show
-		}
-		const all = this.getOnboardingTips();
-		// Filter by condition (keep those whose condition passes or no condition)
-		let pool = all.filter(t => !t.condition || t.condition(this));
-		if (!pool.length) pool = all; // fallback to full set
-		let idx = this.settings.nextTipIndex || 0;
-		if (idx >= pool.length) idx = 0;
-		const tipObj = pool[idx];
-		new OnboardingTipModal(this.app, this, tipObj.text, idx, pool.length).open();
-		this.settings.lastTipDate = today;
-		this.settings.nextTipIndex = (idx + 1) % pool.length;
-		this.saveSettings();
-	}
-
-	disableOnboardingTips(permanent: boolean = true) {
-		this.settings.tipsEnabled = false;
-		if (permanent) this.settings.tipsDismissed = true;
-		this.saveSettings();
-	}
-
-	resetOnboardingTips() {
-		this.settings.nextTipIndex = 0;
-		this.settings.lastTipDate = '';
-		this.settings.tipsDismissed = false;
-		this.settings.tipsEnabled = true;
-		this.saveSettings();
-		new Notice('🔄 Tips progress reset');
-	}
 
 	/** Insert or update the resume card in today's daily note (YYYY-MM-DD).md */
 	async upsertResumeCardInDailyNote() {
@@ -1730,6 +1764,94 @@ class AddMicroTaskModal extends Modal {
 	onClose() { this.contentEl.empty(); }
 }
 
+class ApiKeyPromptModal extends Modal {
+	private plugin: DissertationSupportPlugin;
+	private onComplete: (hasApiKey: boolean) => void;
+
+	constructor(app: App, plugin: DissertationSupportPlugin, onComplete: (hasApiKey: boolean) => void) {
+		super(app);
+		this.plugin = plugin;
+		this.onComplete = onComplete;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('ds-focus-modal');
+		
+		// Header
+		contentEl.createEl('h2', { text: '🤖 AI-Powered Project Creation' });
+		
+		// Description
+		const description = contentEl.createDiv();
+		description.setText('This feature uses AI to guide you through project planning with personalized questions and suggestions. To enable this, you\'ll need an OpenAI API key.');
+		
+		// Status check
+		const statusDiv = contentEl.createDiv({ cls: 'ds-api-status' });
+		const hasKey = this.plugin.settings.openaiApiKey?.trim();
+		if (hasKey) {
+			statusDiv.innerHTML = '✅ API key is already configured';
+		} else {
+			statusDiv.innerHTML = '⚠️ No API key found';
+		}
+
+		// API Key input (if no key exists)
+		let apiKeyInput: HTMLInputElement | null = null;
+		if (!hasKey) {
+			const inputWrapper = contentEl.createDiv({ cls: 'ds-api-input-wrapper' });
+			inputWrapper.createEl('label', { text: 'Enter your OpenAI API key:' });
+			apiKeyInput = inputWrapper.createEl('input', { type: 'password', placeholder: 'sk-...' });
+			apiKeyInput.style.width = '100%';
+			apiKeyInput.style.marginTop = '8px';
+			
+			const helpText = inputWrapper.createDiv({ cls: 'ds-api-help' });
+			helpText.innerHTML = 'Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>. Your key is stored locally in Obsidian.';
+		}
+
+		// Buttons
+		const footer = contentEl.createDiv({ cls: 'ds-focus-footer' });
+		
+		if (hasKey) {
+			// If key exists, just continue with AI
+			const continueBtn = footer.createEl('button', { text: 'Continue with AI', cls: 'ds-button-primary' });
+			continueBtn.addEventListener('click', () => {
+				this.close();
+				this.onComplete(true);
+			});
+		} else {
+			// If no key, offer to set it or skip
+			const setKeyBtn = footer.createEl('button', { text: 'Set API Key & Continue', cls: 'ds-button-primary' });
+			setKeyBtn.addEventListener('click', async () => {
+				const key = apiKeyInput?.value?.trim();
+				if (!key) {
+					new Notice('Please enter a valid API key');
+					return;
+				}
+				this.plugin.settings.openaiApiKey = key;
+				await this.plugin.saveSettings();
+				new Notice('✅ API key saved');
+				this.close();
+				this.onComplete(true);
+			});
+		}
+
+		const skipBtn = footer.createEl('button', { text: 'Skip (Local Mode)', cls: 'ds-button-secondary' });
+		skipBtn.addEventListener('click', () => {
+			this.close();
+			this.onComplete(false);
+		});
+
+		// Auto-focus the input if present
+		if (apiKeyInput) {
+			setTimeout(() => apiKeyInput?.focus(), 100);
+		}
+	}
+
+	onClose() { 
+		this.contentEl.empty(); 
+	}
+}
+
 class DissertationSettingTab extends PluginSettingTab {
 	plugin: DissertationSupportPlugin;
 
@@ -1852,81 +1974,11 @@ class DissertationSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		new Setting(containerEl)
-			.setName('Onboarding tips')
-			.setDesc('Rotating lightweight hints (auto based on frequency)')
-			.addToggle(t => t
-				.setValue(this.plugin.settings.tipsEnabled && !this.plugin.settings.tipsDismissed)
-				.onChange(async v => {
-					this.plugin.settings.tipsEnabled = v;
-					if (!v) this.plugin.settings.tipsDismissed = true;
-					await this.plugin.saveSettings();
-				}))
-			.addDropdown(d => {
-				d.addOption('daily','Daily');
-				d.addOption('every-launch','Every launch');
-				d.addOption('manual','Manual only');
-				d.setValue(this.plugin.settings.tipFrequency || 'daily');
-				d.onChange(async v => { this.plugin.settings.tipFrequency = v as any; await this.plugin.saveSettings(); });
-			})
-			.addButton(b => b.setButtonText('Show tip now')
-				.onClick(() => this.plugin.showNextOnboardingTip(false)))
-			.addButton(b => b.setButtonText('Reset tips')
-				.onClick(() => this.plugin.resetOnboardingTips()));
 
-		new Setting(containerEl)
-			.setName('Reset feature usage flags')
-			.setDesc('Clear recorded usage so conditional tips start fresh')
-			.addButton(b => b.setButtonText('Reset usage')
-				.onClick(async () => { this.plugin.settings.featureUsage = {}; await this.plugin.saveSettings(); new Notice('Usage flags reset'); }));
-
-		new Setting(containerEl)
-			.setName('Disable tips permanently')
-			.setDesc('Turn off all onboarding tips (can reset later)')
-			.addButton(b => b.setWarning().setButtonText('Disable')
-				.onClick(() => { this.plugin.disableOnboardingTips(true); new Notice('🛑 Tips disabled'); this.display(); }));
 	}
 }
 
-class OnboardingTipModal extends Modal {
-	private plugin: DissertationSupportPlugin;
-	private tip: string;
-	private index: number;
-	private total: number;
 
-	constructor(app: App, plugin: DissertationSupportPlugin, tip: string, index: number, total: number) {
-		super(app);
-		this.plugin = plugin;
-		this.tip = tip;
-		this.index = index;
-		this.total = total;
-	}
-
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.empty();
-		contentEl.addClass('ds-focus-modal');
-		contentEl.createEl('h2', { text: `💡 Tip ${this.index + 1}/${this.total}` });
-		const p = contentEl.createDiv();
-		p.addClass('ds-tip-text');
-		// very light markdown: **bold**, `code`
-		let html = this.tip
-			.replace(/`([^`]+)`/g, '<code>$1</code>')
-			.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-		p.innerHTML = html;
-		const hint = contentEl.createDiv({ cls: 'ds-tip-hint' });
-		hint.setText('Use command palette: "Show Onboarding Tip" anytime.');
-		const footer = contentEl.createDiv({ cls: 'ds-focus-footer' });
-		const nextBtn = footer.createEl('button', { text: 'Next tip' });
-		nextBtn.addEventListener('click', () => { this.close(); this.plugin.showNextOnboardingTip(false); });
-		const dismissBtn = footer.createEl('button', { text: 'Dismiss' });
-		dismissBtn.addEventListener('click', () => this.close());
-		const disableBtn = footer.createEl('button', { text: 'Turn off tips' });
-		disableBtn.addEventListener('click', () => { this.plugin.disableOnboardingTips(true); this.close(); new Notice('Tips turned off'); });
-	}
-
-	onClose() { this.contentEl.empty(); }
-}
 
 class ProjectDialogueModal extends Modal {
 	private dialogueService: ProjectDialogueService;
