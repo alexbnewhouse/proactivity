@@ -6,27 +6,29 @@ An ADHD-friendly Obsidian plugin that transforms overwhelming academic projects 
 
 ✅ **AI Project Initiation Dialogue** – Conversational planning that breaks projects into actionable steps  
 ✅ **Academic Project Templates** – 6 pre-built templates with ADHD-optimized task sequences  
-✅ **Project Kanban Boards** – Visual drag-and-drop project management with energy-aware design  
+✅ **Interactive Project Kanban Boards** – Visual drag-and-drop project management with full card functionality  
 ✅ **Daily Micro-Task Board** – Today-focused task management (5-25 minute chunks)  
 ✅ **Resume Cards** – Context preservation in daily notes to reduce restart friction  
-✅ **Proactive Reminders** – Gentle nudges that come to you (configurable intervals)
+✅ **Proactive Reminders** – Gentle nudges that come to you (configurable intervals)  
+✅ **Smart Dissertation Integration** – Automatic AI planning when creating dissertation projects
 
 ## Installation
 
 1. Copy plugin files to `.obsidian/plugins/dissertation-support/`
 2. Enable in Settings → Community Plugins
 3. Configure: Settings → Dissertation Support
-   - Add OpenAI API Key
-   - Set dissertation topic
+   - Add OpenAI API Key (required for AI features)
+   - Set dissertation topic (optional - can be set during project creation)
    - Configure reminder interval
 
 ## Quick Start
 
 1. Click 🧠 brain icon → "Start New Project"
 2. Complete AI dialogue (5-7 questions)
-3. Choose academic template
-4. Open Project Kanban Board
-5. Focus on 2-3 tasks today
+3. For dissertation projects: AI planning triggers automatically!
+4. Watch your Kanban board populate with structured tasks
+5. Use interactive card buttons to manage and complete work
+6. Focus on 2-3 tasks today and build momentum
 
 ## Commands
 

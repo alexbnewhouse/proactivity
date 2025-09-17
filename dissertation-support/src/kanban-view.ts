@@ -1,12 +1,14 @@
-import { ItemView, WorkspaceLeaf, TFile } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFile, Notice } from 'obsidian';
 import { KanbanBoard, KanbanCard, KanbanColumn } from './kanban-service';
+import { CardEditModal } from './card-edit-modal';
 import DissertationSupportPlugin from '../main';
 
 export const KANBAN_VIEW_TYPE = "kanban-view";
 
 export class KanbanView extends ItemView {
 	plugin: DissertationSupportPlugin;
-	currentBoard: KanbanBoard | null = null;
+	public currentBoard: KanbanBoard | null = null;
+	private boardSelector: HTMLSelectElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: DissertationSupportPlugin) {
 		super(leaf);
@@ -37,8 +39,15 @@ export class KanbanView extends ItemView {
 		const toolbar = header.createDiv('kanban-toolbar');
 		
 		// Board selector
-		const boardSelect = toolbar.createEl('select', { cls: 'kanban-board-select' });
-		boardSelect.createEl('option', { text: 'Select a project...', value: '' });
+		this.boardSelector = toolbar.createEl('select', { cls: 'kanban-board-select' });
+		this.populateBoardSelector(this.boardSelector);
+		
+		this.boardSelector.addEventListener('change', () => {
+			const selectedBoardId = this.boardSelector!.value;
+			if (selectedBoardId) {
+				this.loadBoard(selectedBoardId);
+			}
+		});
 		
 		// New board button
 		const newBoardBtn = toolbar.createEl('button', { 
@@ -65,11 +74,99 @@ export class KanbanView extends ItemView {
 		if (!this.currentBoard) {
 			this.showEmptyState(boardContainer);
 		}
+
+		// Add keyboard navigation
+		this.setupKeyboardHandlers();
+	}
+
+	private setupKeyboardHandlers() {
+		// Handle keyboard events for the entire view
+		this.containerEl.addEventListener('keydown', (e) => {
+			// Only handle if the view is focused and no input is active
+			if (document.activeElement?.tagName === 'INPUT' || 
+				document.activeElement?.tagName === 'TEXTAREA' ||
+				document.activeElement?.tagName === 'SELECT') {
+				return;
+			}
+
+			switch (e.key) {
+				case 'n':
+					if (e.ctrlKey || e.metaKey) {
+						e.preventDefault();
+						this.showQuickAddCard();
+					}
+					break;
+				case 'r':
+					if (e.ctrlKey || e.metaKey) {
+						e.preventDefault();
+						this.renderBoard();
+					}
+					break;
+				case 'f':
+					if (e.ctrlKey || e.metaKey) {
+						e.preventDefault();
+						this.focusSearch();
+					}
+					break;
+				case 'Escape':
+					this.clearSelection();
+					break;
+			}
+		});
+
+		// Make the container focusable
+		this.containerEl.setAttribute('tabindex', '0');
+	}
+
+	private populateBoardSelector(selectElement: HTMLSelectElement) {
+		selectElement.empty();
+		selectElement.createEl('option', { text: 'Select a project...', value: '' });
+		
+		const allBoards = this.plugin.projectKanbanService.getAllBoards();
+		allBoards.forEach(board => {
+			const option = selectElement.createEl('option', { 
+				text: board.title, 
+				value: board.id 
+			});
+			if (this.currentBoard && board.id === this.currentBoard.id) {
+				option.selected = true;
+			}
+		});
+	}
+
+	private async loadBoard(boardId: string) {
+		const board = this.plugin.projectKanbanService.getBoard(boardId);
+		if (board) {
+			this.currentBoard = board;
+			this.renderBoard();
+			// Save as last opened board
+			this.plugin.settings.lastOpenedBoardId = boardId;
+			await this.plugin.saveSettings();
+		}
 	}
 
 	private async loadSavedBoard() {
-		// TODO: Load last opened board from settings
-		// For now, show empty state
+		// Try to load the last opened board
+		const lastBoardId = this.plugin.settings.lastOpenedBoardId;
+		if (lastBoardId) {
+			const board = this.plugin.projectKanbanService.getBoard(lastBoardId);
+			if (board) {
+				this.currentBoard = board;
+				return;
+			}
+		}
+
+		// Fallback: load the most recently created board
+		const allBoards = this.plugin.projectKanbanService.getAllBoards();
+		if (allBoards.length > 0) {
+			// Sort by creation time and take the most recent
+			const mostRecent = allBoards.sort((a, b) => b.created - a.created)[0];
+			this.currentBoard = mostRecent;
+			
+			// Update saved preference
+			this.plugin.settings.lastOpenedBoardId = mostRecent.id;
+			await this.plugin.saveSettings();
+		}
 	}
 
 	private showEmptyState(container: HTMLElement) {
@@ -108,10 +205,122 @@ export class KanbanView extends ItemView {
 		if (demoBoard) {
 			this.currentBoard = demoBoard;
 			this.renderBoard();
+			
+			// Update board selector
+			this.refreshBoardSelector();
+			
+			// Save as last opened board
+			this.plugin.settings.lastOpenedBoardId = demoBoard.id;
+			await this.plugin.saveSettings();
 		}
 	}
 
-	private renderBoard() {
+	public refreshBoardSelector() {
+		if (this.boardSelector) {
+			this.populateBoardSelector(this.boardSelector);
+		}
+	}
+
+	private showQuickAddCard() {
+		if (!this.currentBoard) return;
+		
+		// Create a floating input for quick card creation
+		const quickInput = document.createElement('div');
+		quickInput.className = 'kanban-quick-add-overlay';
+		quickInput.innerHTML = `
+			<div class="kanban-quick-add-modal">
+				<h3>Quick Add Card</h3>
+				<input type="text" placeholder="Enter card title and press Enter..." class="kanban-quick-input" />
+				<div class="kanban-quick-columns">
+					${this.currentBoard.columns.map(col => 
+						`<button class="kanban-quick-column" data-column-id="${col.id}">${col.title}</button>`
+					).join('')}
+				</div>
+				<div class="kanban-quick-help">
+					<kbd>Enter</kbd> to add • <kbd>Escape</kbd> to cancel
+				</div>
+			</div>
+		`;
+		
+		document.body.appendChild(quickInput);
+		
+		const input = quickInput.querySelector('.kanban-quick-input') as HTMLInputElement;
+		const columns = quickInput.querySelectorAll('.kanban-quick-column');
+		let selectedColumnId = this.currentBoard.columns[0]?.id || '';
+		
+		// Highlight first column by default
+		if (columns.length > 0) {
+			columns[0].classList.add('selected');
+		}
+		
+		// Handle column selection
+		columns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				columns.forEach(c => c.classList.remove('selected'));
+				btn.classList.add('selected');
+				selectedColumnId = btn.getAttribute('data-column-id') || '';
+				input.focus();
+			});
+		});
+		
+		// Handle input
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' && input.value.trim()) {
+				this.createQuickCard(input.value.trim(), selectedColumnId);
+				document.body.removeChild(quickInput);
+			} else if (e.key === 'Escape') {
+				document.body.removeChild(quickInput);
+			}
+		});
+		
+		// Handle click outside to close
+		quickInput.addEventListener('click', (e) => {
+			if (e.target === quickInput) {
+				document.body.removeChild(quickInput);
+			}
+		});
+		
+		// Focus input
+		setTimeout(() => input.focus(), 100);
+	}
+
+	private async createQuickCard(title: string, columnId: string) {
+		if (!this.currentBoard) return;
+		
+		const newCard = this.plugin.projectKanbanService.createQuickCard(
+			this.currentBoard.id,
+			columnId,
+			title,
+			''
+		);
+		
+		if (newCard) {
+			// Reload the board from the service
+			const updatedBoard = this.plugin.projectKanbanService.getBoard(this.currentBoard.id);
+			if (updatedBoard) {
+				this.currentBoard = updatedBoard;
+				this.renderBoard();
+			}
+		}
+	}
+
+	private focusSearch() {
+		// Focus the board selector for now - in the future could add a search box
+		if (this.boardSelector) {
+			this.boardSelector.focus();
+		}
+	}
+
+	private clearSelection() {
+		// Clear any selected cards or active states
+		const selectedCards = this.containerEl.querySelectorAll('.kanban-card.selected');
+		selectedCards.forEach(card => card.removeClass('selected'));
+		
+		// Focus the main container
+		this.containerEl.focus();
+	}
+
+	public renderBoard() {
 		if (!this.currentBoard) return;
 
 		const container = this.containerEl.querySelector('.kanban-board') as HTMLElement;
@@ -254,16 +463,189 @@ export class KanbanView extends ItemView {
 			text: '✏️',
 			cls: 'kanban-card-action',
 			attr: { title: 'Edit card' }
-		}).addEventListener('click', () => this.editCard(card));
+		}).addEventListener('click', (e) => {
+			e.stopPropagation();
+			console.log('Edit button clicked for card:', card.title);
+			this.editCard(card);
+		});
 
 		actions.createEl('button', { 
 			text: '🔗',
 			cls: 'kanban-card-action',
 			attr: { title: 'Link to note' }
-		}).addEventListener('click', () => this.linkCardToNote(card));
+		}).addEventListener('click', (e) => {
+			e.stopPropagation();
+			console.log('Link button clicked for card:', card.title);
+			this.linkCardToNote(card);
+		});
+
+		// Complete button (only show if not already completed)
+		if (card.status !== 'completed') {
+			actions.createEl('button', { 
+				text: '✅',
+				cls: 'kanban-card-action',
+				attr: { title: 'Mark complete' }
+			}).addEventListener('click', (e) => {
+				e.stopPropagation();
+				console.log('Complete button clicked for card:', card.title);
+				this.completeCard(card);
+			});
+		}
+
+		// Delete button
+		actions.createEl('button', { 
+			text: '🗑️',
+			cls: 'kanban-card-action kanban-card-action-danger',
+			attr: { title: 'Delete card' }
+		}).addEventListener('click', (e) => {
+			e.stopPropagation();
+			console.log('Delete button clicked for card:', card.title);
+			this.deleteCard(card);
+		});
 
 		// Drag & drop handlers
 		this.setupCardDrag(cardEl, card);
+		
+		// Right-click context menu
+		cardEl.addEventListener('contextmenu', (e) => {
+			e.preventDefault();
+			this.showCardContextMenu(e, card);
+		});
+	}
+
+	private showCardContextMenu(e: MouseEvent, card: KanbanCard) {
+		const menu = document.createElement('div');
+		menu.className = 'kanban-context-menu';
+		menu.innerHTML = `
+			<div class="kanban-context-item" data-action="edit">✏️ Edit Card</div>
+			<div class="kanban-context-item" data-action="duplicate">📋 Duplicate</div>
+			<div class="kanban-context-item" data-action="link">🔗 Link to Note</div>
+			<div class="kanban-context-divider"></div>
+			<div class="kanban-context-item kanban-context-danger" data-action="delete">🗑️ Delete</div>
+		`;
+		
+		// Position menu at mouse
+		menu.style.position = 'fixed';
+		menu.style.left = e.clientX + 'px';
+		menu.style.top = e.clientY + 'px';
+		menu.style.zIndex = '10000';
+		
+		document.body.appendChild(menu);
+		
+		// Handle menu actions
+		menu.addEventListener('click', async (menuEvent) => {
+			const target = menuEvent.target as HTMLElement;
+			const action = target.getAttribute('data-action');
+			
+			switch (action) {
+				case 'edit':
+					this.editCard(card);
+					break;
+				case 'duplicate':
+					await this.duplicateCard(card);
+					break;
+				case 'link':
+					this.linkCardToNote(card);
+					break;
+				case 'delete':
+					await this.deleteCard(card);
+					break;
+			}
+			
+			document.body.removeChild(menu);
+		});
+		
+		// Close menu on click outside
+		const closeMenu = (event: Event) => {
+			if (!menu.contains(event.target as Node)) {
+				if (document.body.contains(menu)) {
+					document.body.removeChild(menu);
+				}
+				document.removeEventListener('click', closeMenu);
+			}
+		};
+		
+		setTimeout(() => {
+			document.addEventListener('click', closeMenu);
+		}, 100);
+	}
+
+	private async duplicateCard(card: KanbanCard) {
+		if (!this.currentBoard) return;
+		
+		const duplicateCard = this.plugin.projectKanbanService.createQuickCard(
+			this.currentBoard.id,
+			card.columnId,
+			`${card.title} (Copy)`,
+			card.description
+		);
+		
+		if (duplicateCard) {
+			// Copy additional properties
+			duplicateCard.energyLevel = card.energyLevel;
+			duplicateCard.priority = card.priority;
+			duplicateCard.tags = [...card.tags];
+			duplicateCard.timeEstimate = { ...card.timeEstimate };
+			
+			// Reload and render
+			const updatedBoard = this.plugin.projectKanbanService.getBoard(this.currentBoard.id);
+			if (updatedBoard) {
+				this.currentBoard = updatedBoard;
+				this.renderBoard();
+			}
+		}
+	}
+
+	private async deleteCard(card: KanbanCard) {
+		if (!this.currentBoard) return;
+		
+		// Simple confirmation
+		const confirmed = confirm(`Delete "${card.title}"?\n\nThis action cannot be undone.`);
+		if (!confirmed) return;
+		
+		// Remove card from board
+		const cardIndex = this.currentBoard.cards.findIndex(c => c.id === card.id);
+		if (cardIndex !== -1) {
+			this.currentBoard.cards.splice(cardIndex, 1);
+			this.plugin.projectKanbanService.saveBoard(this.currentBoard);
+			this.renderBoard();
+		}
+	}
+
+	private async completeCard(card: KanbanCard) {
+		if (!this.currentBoard) return;
+		
+		// Find the card and update its status
+		const cardIndex = this.currentBoard.cards.findIndex(c => c.id === card.id);
+		if (cardIndex !== -1) {
+			this.currentBoard.cards[cardIndex].status = 'completed';
+			this.currentBoard.cards[cardIndex].completed = Date.now();
+			
+			// Move to completed column if it exists
+			const completedColumn = this.currentBoard.columns.find(
+				col => col.title.toLowerCase().includes('complete') || 
+				       col.title.toLowerCase().includes('done')
+			);
+			
+			if (completedColumn) {
+				this.currentBoard.cards[cardIndex].columnId = completedColumn.id;
+			}
+			
+			// Save and re-render
+			this.plugin.projectKanbanService.saveBoard(this.currentBoard);
+			this.renderBoard();
+		}
+	}
+
+	private setupCardDrag(cardEl: HTMLElement, card: KanbanCard) {
+		cardEl.addEventListener('dragstart', (e) => {
+			e.dataTransfer?.setData('text/card-id', card.id);
+			cardEl.addClass('kanban-card-dragging');
+		});
+
+		cardEl.addEventListener('dragend', () => {
+			cardEl.removeClass('kanban-card-dragging');
+		});
 	}
 
 	private setupDropZone(container: HTMLElement, column: KanbanColumn) {
@@ -284,17 +666,6 @@ export class KanbanView extends ItemView {
 			if (cardId && this.currentBoard) {
 				this.moveCard(cardId, column.id);
 			}
-		});
-	}
-
-	private setupCardDrag(cardEl: HTMLElement, card: KanbanCard) {
-		cardEl.addEventListener('dragstart', (e) => {
-			e.dataTransfer?.setData('text/card-id', card.id);
-			cardEl.addClass('kanban-card-dragging');
-		});
-
-		cardEl.addEventListener('dragend', () => {
-			cardEl.removeClass('kanban-card-dragging');
 		});
 	}
 
@@ -336,16 +707,14 @@ export class KanbanView extends ItemView {
 	}
 
 	private async addNewCard(column: KanbanColumn) {
-		// Simple inline card creation
-		const cardTitle = await this.promptForCardTitle();
-		if (!cardTitle || !this.currentBoard) return;
+		if (!this.currentBoard) return;
 
 		try {
-			const newCard = this.plugin.projectKanbanService.addCard(
+			const newCard = this.plugin.projectKanbanService.createQuickCard(
 				this.currentBoard.id,
-				cardTitle,
-				'', // description
-				column.id
+				column.id,
+				'New Task',
+				'Click to edit this task...'
 			);
 			
 			if (newCard) {
@@ -354,6 +723,11 @@ export class KanbanView extends ItemView {
 				if (updatedBoard) {
 					this.currentBoard = updatedBoard;
 					this.renderBoard();
+					
+					// Immediately open edit modal for new card
+					setTimeout(() => {
+						this.editCard(newCard);
+					}, 100);
 				}
 			}
 			
@@ -415,13 +789,61 @@ export class KanbanView extends ItemView {
 	}
 
 	private async editCard(card: KanbanCard) {
-		// TODO: Open detailed card editor modal
-		console.log('Edit card:', card.title);
+		const modal = new CardEditModal(this.plugin, card, (updatedCard) => {
+			// Update card in current board
+			if (this.currentBoard) {
+				const cardIndex = this.currentBoard.cards.findIndex(c => c.id === card.id);
+				if (cardIndex !== -1) {
+					this.currentBoard.cards[cardIndex] = updatedCard;
+					this.plugin.projectKanbanService.saveBoard(this.currentBoard);
+					this.renderBoard(); // Re-render to show changes
+				}
+			}
+		});
+		modal.open();
 	}
 
 	private async linkCardToNote(card: KanbanCard) {
-		// TODO: Link card to an Obsidian note
-		console.log('Link card to note:', card.title);
+		// Create a new note for this card or link to existing
+		const noteName = card.title.replace(/[^\w\s-]/g, '').trim();
+		const fileName = `${noteName}.md`;
+		
+		try {
+			// Check if note already exists
+			const existingNote = this.app.vault.getAbstractFileByPath(fileName);
+			
+			if (existingNote) {
+				// Open existing note
+				await this.app.workspace.getLeaf().openFile(existingNote as TFile);
+			} else {
+				// Create new note with card content
+				const noteContent = `# ${card.title}
+
+${card.description}
+
+## Task Details
+- **Energy Level**: ${card.energyLevel || 'Not set'}
+- **Priority**: ${card.priority || 'medium'}
+- **Time Estimate**: ${card.timeEstimate?.realistic || 0} minutes
+- **Status**: ${card.status}
+
+## Subtasks
+${card.subtasks.map(st => `- [${st.status === 'done' ? 'x' : ' '}] ${st.text}`).join('\n')}
+
+## Notes
+${card.focusNotes || ''}
+
+---
+*Generated from Kanban card*`;
+				
+				const newFile = await this.app.vault.create(fileName, noteContent);
+				await this.app.workspace.getLeaf().openFile(newFile);
+			}
+		} catch (error) {
+			console.error('Error linking card to note:', error);
+			// Show user-friendly error
+			new Notice('Could not create or open note. Please check your vault permissions.');
+		}
 	}
 
 	async onClose() {

@@ -1,0 +1,271 @@
+/**
+ * Card Edit Modal Styles
+ * ADHD-Friendly Design Principles:
+ * - Clean, uncluttered interface
+ * - Clear visual hierarchy
+ * - Gentle colors that don't overstimulate
+ * - Progressive disclosure of complex features
+ */
+
+.card-edit-modal .modal {
+	max-width: 600px;
+	min-height: 500px;
+}
+
+.card-edit-modal h2 {
+	color: var(--text-accent);
+	margin-bottom: 1.5em;
+	text-align: center;
+}
+
+/* Section Organization */
+.card-edit-section {
+	margin-bottom: 2em;
+	padding: 1em;
+	background: var(--background-secondary);
+	border-radius: 8px;
+	border-left: 3px solid var(--interactive-accent);
+}
+
+.card-edit-section h3 {
+	color: var(--text-accent);
+	margin-bottom: 1em;
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+}
+
+.section-header-with-help {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	margin-bottom: 1em;
+}
+
+.help-icon {
+	cursor: help;
+	opacity: 0.7;
+	transition: opacity 0.2s ease;
+}
+
+.help-icon:hover {
+	opacity: 1;
+}
+
+.section-header-with-action {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 1em;
+}
+
+/* Time Estimation Grid */
+.time-estimation-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 1em;
+	margin-bottom: 1em;
+}
+
+.time-field {
+	padding: 0.75em;
+	background: var(--background-primary);
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.time-field label {
+	display: block;
+	font-weight: 600;
+	color: var(--text-accent);
+	margin-bottom: 0.25em;
+}
+
+.time-field-desc {
+	font-size: 0.8em;
+	color: var(--text-muted);
+	margin-bottom: 0.5em;
+}
+
+.time-field input {
+	width: 60px;
+	margin-right: 0.5em;
+}
+
+.time-unit {
+	color: var(--text-muted);
+	font-size: 0.9em;
+}
+
+.pomodoro-estimate {
+	text-align: center;
+	padding: 0.75em;
+	background: var(--background-primary-alt);
+	border-radius: 6px;
+	font-size: 1.1em;
+}
+
+.pomodoro-estimate strong {
+	color: var(--text-accent);
+	font-size: 1.2em;
+}
+
+/* Subtasks Management */
+.subtasks-container {
+	max-height: 200px;
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary);
+}
+
+.subtask-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.5em;
+	border-bottom: 1px solid var(--background-modifier-border);
+	transition: background-color 0.2s ease;
+}
+
+.subtask-item:last-child {
+	border-bottom: none;
+}
+
+.subtask-item:hover {
+	background: var(--background-secondary);
+}
+
+.subtask-drag-handle {
+	color: var(--text-muted);
+	cursor: grab;
+	user-select: none;
+	font-size: 0.8em;
+}
+
+.subtask-item input[type="checkbox"] {
+	margin: 0;
+}
+
+.subtask-item input[type="text"] {
+	flex: 1;
+	border: none;
+	background: transparent;
+	padding: 0.25em 0.5em;
+}
+
+.subtask-item input[type="text"]:focus {
+	background: var(--background-primary-alt);
+	border-radius: 4px;
+}
+
+.subtask-time-estimate {
+	color: var(--text-muted);
+	font-size: 0.9em;
+	padding: 0.25em 0.5em;
+	background: var(--background-secondary);
+	border-radius: 4px;
+}
+
+.subtask-delete {
+	background: none;
+	border: none;
+	cursor: pointer;
+	opacity: 0.6;
+	transition: opacity 0.2s ease;
+	padding: 0.25em;
+}
+
+.subtask-delete:hover {
+	opacity: 1;
+}
+
+.subtasks-empty {
+	text-align: center;
+	padding: 2em;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+/* Action Buttons */
+.card-edit-actions {
+	display: flex;
+	gap: 1em;
+	justify-content: flex-end;
+	margin-top: 2em;
+	padding-top: 1em;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.card-edit-btn {
+	padding: 0.75em 1.5em;
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+	font-weight: 600;
+	transition: all 0.2s ease;
+}
+
+.card-edit-btn-primary {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.card-edit-btn-primary:hover {
+	background: var(--interactive-accent-hover);
+}
+
+.card-edit-btn-secondary {
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border: 1px solid var(--background-modifier-border);
+}
+
+.card-edit-btn-secondary:hover {
+	background: var(--background-modifier-hover);
+}
+
+.card-edit-btn-small {
+	padding: 0.5em 1em;
+	font-size: 0.9em;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: background-color 0.2s ease;
+}
+
+.card-edit-btn-small:hover {
+	background: var(--interactive-accent-hover);
+}
+
+/* Form Inputs Enhancement */
+.card-edit-modal .setting-item-control {
+	min-width: 0;
+}
+
+.card-edit-modal textarea {
+	min-height: 80px !important;
+	resize: vertical;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+	.card-edit-modal .modal {
+		max-width: 95vw;
+		margin: 1em;
+	}
+	
+	.time-estimation-grid {
+		grid-template-columns: 1fr;
+	}
+	
+	.card-edit-actions {
+		flex-direction: column;
+	}
+	
+	.card-edit-btn {
+		width: 100%;
+	}
+}

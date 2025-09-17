@@ -81,6 +81,7 @@ interface DissertationSupportSettings {
 		openedFocusPanel?: boolean;
 		toggledReminders?: boolean;
 	};
+	lastOpenedBoardId?: string; // Remember last Kanban board
 }
 
 const DEFAULT_SETTINGS: DissertationSupportSettings = {
@@ -103,6 +104,7 @@ const DEFAULT_SETTINGS: DissertationSupportSettings = {
 	tipFrequency: 'daily',
 	firstRunCompleted: false,
 	featureUsage: {},
+	lastOpenedBoardId: '',
 }
 
 export default class DissertationSupportPlugin extends Plugin {
@@ -684,6 +686,53 @@ export default class DissertationSupportPlugin extends Plugin {
 					new Notice('⚠️ Project created, but task generation failed. You can add tasks manually.');
 				}
 
+				// Auto-generate Kanban board from the plan
+				try {
+					const kanbanBoard = await this.projectDialogueService.createKanbanFromPlan('', plan);
+					if (kanbanBoard) {
+						new Notice(`📋 Created Kanban board: "${kanbanBoard.title}" - Open the Project Kanban view to see it!`);
+						
+						// Update settings to remember this board
+						this.settings.lastOpenedBoardId = kanbanBoard.id;
+						await this.saveSettings();
+						
+						// If Kanban view is already open, refresh it with the new board
+						const leaf = this.app.workspace.getLeavesOfType(KANBAN_VIEW_TYPE)[0];
+						if (leaf && leaf.view instanceof KanbanView) {
+							leaf.view.currentBoard = kanbanBoard;
+							leaf.view.renderBoard();
+							leaf.view.refreshBoardSelector();
+							this.app.workspace.revealLeaf(leaf);
+						}
+					}
+				} catch (error) {
+					console.error('[Project Creation] Failed to generate Kanban board:', error);
+					new Notice('⚠️ Project created, but Kanban board generation failed.');
+				}
+
+				// Check if this is a dissertation project and trigger AI planning
+				try {
+					const sessionContext = await this.projectDialogueService.getProjectContext('');
+					if (sessionContext && sessionContext.type === 'dissertation') {
+						// Update dissertation topic in settings if provided
+						if (sessionContext.title && !this.settings.dissertationTopic) {
+							this.settings.dissertationTopic = sessionContext.title;
+							await this.saveSettings();
+						}
+						
+						// Trigger AI dissertation planning if API key is available
+						if (this.settings.openaiApiKey) {
+							new Notice('🤖 Generating comprehensive dissertation plan...');
+							await this.runAIPlanning('dissertation');
+						} else {
+							new Notice('💡 Tip: Set your OpenAI API key in settings to generate an AI-powered dissertation plan!');
+						}
+					}
+				} catch (error) {
+					console.error('[Project Creation] Failed to trigger AI planning:', error);
+					// Don't show error to user, this is a bonus feature
+				}
+
 				// Track feature usage
 				if (!this.settings.featureUsage) this.settings.featureUsage = {};
 				this.settings.featureUsage.createdPlan = true;
@@ -900,7 +949,12 @@ export default class DissertationSupportPlugin extends Plugin {
 			this.projectKanbanService = new ProjectKanbanService(this.taskService);
 
 			// ProjectDialogueService: AI-driven project initiation dialogue
-			this.projectDialogueService = new ProjectDialogueService(this.aiService, this.taskService, this.academicTemplateService);
+			this.projectDialogueService = new ProjectDialogueService(
+				this.aiService, 
+				this.taskService, 
+				this.academicTemplateService,
+				this.projectKanbanService
+			);
 
 			console.log('[ADHD Services] All services initialized successfully');
 
@@ -1286,14 +1340,15 @@ export default class DissertationSupportPlugin extends Plugin {
 				outputFolder: this.settings.planOutputFolder,
 			};
 
-			const result = await this.planningService.generatePlan(planConfig);
+			const planContent = await this.planningService.generatePlan(planConfig);
+			const result = await this.planningService.createPlanFile(planConfig, planContent);
 			
 			// Track feature usage
 			if (!this.settings.featureUsage) this.settings.featureUsage = {};
 			this.settings.featureUsage.createdPlan = true;
 			this.saveSettings();
 			
-			new Notice(`✅ ${planType === 'prospectus' ? 'Prospectus' : 'Dissertation'} plan created!`);
+			new Notice(`✅ ${planType === 'prospectus' ? 'Prospectus' : 'Dissertation'} plan created at ${result.filePath}!`);
 			
 		} catch (error) {
 			console.error('[AI Planning] Failed:', error);

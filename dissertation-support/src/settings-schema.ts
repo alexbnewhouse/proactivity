@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS = {
   theme: 'auto' as const,
   debugMode: false,
   lastUsedFeatures: {} as Record<string, number>, // For tip frequency logic
+  lastOpenedBoardId: '', // Remember last Kanban board
 } as const;
 
 // Zod schemas with graceful defaults
@@ -43,6 +44,7 @@ export const SettingsSchema = z.object({
   theme: ThemeSchema,
   debugMode: z.boolean().default(DEFAULT_SETTINGS.debugMode),
   lastUsedFeatures: z.record(z.string(), z.number()).default(DEFAULT_SETTINGS.lastUsedFeatures),
+  lastOpenedBoardId: z.string().default(DEFAULT_SETTINGS.lastOpenedBoardId),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

@@ -12,6 +12,7 @@
 import { AIService } from './ai-service';
 import { TaskService } from './task-service';
 import { AcademicTemplateService, AcademicTemplate } from './academic-templates';
+import { ProjectKanbanService, KanbanBoard } from './kanban-service';
 
 export interface ProjectContext {
   type: 'dissertation' | 'paper' | 'proposal' | 'chapter' | 'other';
@@ -68,12 +69,19 @@ export class ProjectDialogueService {
   private aiService: AIService;
   private taskService: TaskService;
   private academicTemplateService: AcademicTemplateService;
+  private kanbanService?: ProjectKanbanService;
   private activeSessions: Map<string, DialogueSession> = new Map();
 
-  constructor(aiService: AIService, taskService: TaskService, academicTemplateService?: AcademicTemplateService) {
+  constructor(
+    aiService: AIService, 
+    taskService: TaskService, 
+    academicTemplateService?: AcademicTemplateService,
+    kanbanService?: ProjectKanbanService
+  ) {
     this.aiService = aiService;
     this.taskService = taskService;
     this.academicTemplateService = academicTemplateService || new AcademicTemplateService();
+    this.kanbanService = kanbanService;
   }
 
   /**
@@ -247,6 +255,149 @@ Please create a structured project plan that breaks this work into manageable ph
       console.error('[ProjectDialogue] Task creation failed:', error);
       return { tasksCreated: 0, immediateActions: [] };
     }
+  }
+
+  /**
+   * Create Kanban board from generated project plan
+   * ADHD-friendly: Visual project management from dialogue
+   */
+  async createKanbanFromPlan(sessionId: string, plan: ProjectPlan): Promise<KanbanBoard | null> {
+    if (!this.kanbanService) {
+      console.warn('[ProjectDialogue] No Kanban service available');
+      return null;
+    }
+
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    try {
+      // Convert dialogue context to pseudo-template for board creation
+      const pseudoTemplate = this.convertPlanToTemplate(plan, session.projectContext);
+      
+      // Create board using the Kanban service
+      const board = this.kanbanService.createBoardFromTemplate(
+        pseudoTemplate,
+        plan.title,
+        {
+          sessionId,
+          dialogueResponses: session.responses,
+          generatedAt: Date.now()
+        }
+      );
+
+      console.log(`[ProjectDialogue] Created Kanban board: ${board.title}`);
+      return board;
+
+    } catch (error) {
+      console.error('[ProjectDialogue] Kanban creation failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Convert project plan to template format for Kanban creation
+   */
+  private convertPlanToTemplate(plan: ProjectPlan, context: ProjectContext): AcademicTemplate {
+    // Create template phases from project phases
+    const templatePhases = plan.phases.map(phase => ({
+      name: phase.name,
+      description: phase.description,
+      estimatedDays: phase.estimatedWeeks * 7, // Convert weeks to days
+      tasks: phase.tasks.map(task => ({
+        title: task,
+        description: `Part of ${phase.name} phase`,
+        energyLevel: this.estimateEnergyLevel(task),
+        estimatedMinutes: this.estimateTaskTime(task),
+        adhdFriendly: true,
+        tips: []
+      })),
+      checkpoints: [`Complete ${phase.name} phase`]
+    }));
+
+    // Add immediate action phase at the beginning
+    if (plan.immediateNextSteps.length > 0) {
+      templatePhases.unshift({
+        name: 'Quick Start',
+        description: 'Immediate actions to build momentum',
+        estimatedDays: 3,
+        tasks: plan.immediateNextSteps.map(step => ({
+          title: step,
+          description: 'Immediate next step from project planning dialogue',
+          energyLevel: 'moderate' as const,
+          estimatedMinutes: 25,
+          adhdFriendly: true,
+          tips: ['Start with this to build momentum', 'Keep it small and achievable']
+        })),
+        checkpoints: ['Build initial momentum', 'Complete first tasks']
+      });
+    }
+
+    return {
+      id: `dialogue-generated-${Date.now()}`,
+      name: `${plan.title} Project`,
+      description: `Project plan generated from AI dialogue on ${new Date().toLocaleDateString()}`,
+      category: this.mapContextTypeToCategory(context.type),
+      estimatedWeeks: plan.phases.reduce((total, phase) => total + phase.estimatedWeeks, 0),
+      phases: templatePhases,
+      energyProfile: 'moderate' as const,
+      adhdTips: [
+        'This plan was created from your dialogue responses',
+        'Start with the Quick Start phase to build momentum',
+        'Break larger tasks into 5-25 minute chunks',
+        'Remember: progress over perfection'
+      ]
+    };
+  }
+
+  /**
+   * Map dialogue context type to template category
+   */
+  private mapContextTypeToCategory(type: string): AcademicTemplate['category'] {
+    switch (type) {
+      case 'dissertation': return 'dissertation';
+      case 'paper': return 'paper';
+      case 'proposal': return 'proposal';
+      case 'chapter': return 'chapter';
+      default: return 'paper'; // Default fallback
+    }
+  }
+
+  /**
+   * Estimate energy level required for a task based on keywords
+   */
+  private estimateEnergyLevel(taskTitle: string): 'low' | 'moderate' | 'high' {
+    const lowEnergyWords = ['review', 'organize', 'format', 'edit', 'proofread', 'collect'];
+    const highEnergyWords = ['write', 'create', 'design', 'analyze', 'synthesize', 'plan'];
+    
+    const title = taskTitle.toLowerCase();
+    
+    if (lowEnergyWords.some(word => title.includes(word))) {
+      return 'low';
+    } else if (highEnergyWords.some(word => title.includes(word))) {
+      return 'high';
+    }
+    
+    return 'moderate';
+  }
+
+  /**
+   * Estimate task time based on task complexity
+   */
+  private estimateTaskTime(taskTitle: string): number {
+    const complexWords = ['write', 'create', 'develop', 'design', 'analyze'];
+    const simpleWords = ['review', 'organize', 'format', 'collect'];
+    
+    const title = taskTitle.toLowerCase();
+    
+    if (complexWords.some(word => title.includes(word))) {
+      return 45; // 45 minutes for complex tasks
+    } else if (simpleWords.some(word => title.includes(word))) {
+      return 15; // 15 minutes for simple tasks
+    }
+    
+    return 25; // 25 minutes default (one pomodoro)
   }
 
   /**
@@ -540,5 +691,26 @@ ${responses}`;
       estimatedMinutes: (task as any).estimatedMinutes || 25, // Added as metadata by template
       energyLevel: ((task as any).energyLevel === 'moderate' ? 'medium' : (task as any).energyLevel) || 'medium',
     }));
+  }
+
+  /**
+   * Get the project context from the most recent session
+   * Used to determine project type for additional AI planning
+   */
+  getProjectContext(sessionId?: string): ProjectContext | null {
+    if (sessionId) {
+      const session = this.activeSessions.get(sessionId);
+      return session ? session.projectContext : null;
+    }
+    
+    // If no sessionId provided, get the most recent session
+    const sessions = Array.from(this.activeSessions.values());
+    if (sessions.length === 0) return null;
+    
+    const mostRecent = sessions.reduce((latest, current) => 
+      current.updated > latest.updated ? current : latest
+    );
+    
+    return mostRecent.projectContext;
   }
 }

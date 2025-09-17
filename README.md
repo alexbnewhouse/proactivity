@@ -23,7 +23,7 @@ The goal: reduce activation energy and maintain continuity in your academic work
 
 ## ✨ Core Features (Phase 2 Complete)
 
-### 🤖 AI Project Initiation Dialogue
+### 🤖 AI Project Initiation Dialogue (ENHANCED!)
 **Stop staring at blank pages.** A conversational AI guide asks 5-7 targeted questions about your project, then generates a structured plan with immediate next steps.
 
 **ADHD-friendly design:**
@@ -31,6 +31,9 @@ The goal: reduce activation energy and maintain continuity in your academic work
 - Short dialogue sessions (5-10 minutes max)
 - Saves progress so you never lose work
 - Generates immediately actionable tasks
+- **NEW**: Automatic dissertation planning for dissertation projects
+- **NEW**: Seamless integration with Kanban boards
+- **NEW**: Smart project context detection and API key management
 
 ### 📋 Academic Project Templates (6 Pre-Built)
 **Pre-structured academic workflows** designed specifically for neurodivergent minds:
@@ -48,15 +51,17 @@ The goal: reduce activation energy and maintain continuity in your academic work
 - 🎯 Clear phase progression with checkpoints
 - 💡 Built-in ADHD-specific tips and strategies
 
-### 📊 Project Kanban Boards (NEW!)
-**Visual project management** that evolves with your work:
+### 📊 Project Kanban Boards (ENHANCED!)
+**Visual project management** with full interactive functionality:
 
 - 🎨 **Drag-and-drop interface** for moving tasks between project phases
 - ⚡ **Energy-aware task organization** - match tasks to your current energy level
 - ⏱️ **ADHD-friendly time estimation** with optimistic/realistic/pessimistic ranges
-- 📈 **Visual progress tracking** with completion percentages
+- 📈 **Visual progress tracking** with completion percentages and subtask breakdown
 - 🚦 **WIP limits** to prevent overwhelm
 - 🎯 **Focus views** to reduce cognitive load
+- ✅ **Interactive card actions** - edit, complete, link to notes, and delete cards
+- 🔗 **Smart project integration** - boards created from project dialogue appear instantly
 
 ### ✅ Daily Micro-Task Board  
 **Today-focused task management** that prevents backlog hoarding:
@@ -100,17 +105,19 @@ The goal: reduce activation energy and maintain continuity in your academic work
 ### 5-Minute Setup
 1. **Configure Settings**: Settings → Dissertation Support
    - Add OpenAI API Key (required for AI features)
-   - Set your dissertation topic
+   - Set your dissertation topic (optional - can be set during project creation)
    - Configure reminder interval (default: 60 minutes)
    
 2. **Start Your First Project**: 
    - Click the 🧠 brain icon in the ribbon
    - Select "Start New Project"
    - Follow the AI dialogue (5-7 questions)
-   - Choose an academic template
+   - **NEW**: For dissertation projects, AI planning triggers automatically!
+   - Choose an academic template and watch your Kanban board populate
    
 3. **Build Momentum**:
-   - Open the Project Kanban Board
+   - Open the Project Kanban Board (auto-updates with new projects)
+   - Use interactive card buttons to edit, complete, and manage tasks
    - Focus on just 2-3 tasks today
    - Let proactive reminders keep you on track
 
@@ -122,11 +129,11 @@ The goal: reduce activation energy and maintain continuity in your academic work
 ```
 🌅 Morning: Check Resume Card in daily note
     ↓
-🎯 Pick 2-3 Micro-Tasks from your board
+🎯 Pick 2-3 Micro-Tasks from your Kanban board
     ↓  
 ⚡ Work in 25-minute focus sessions
     ↓
-📊 Drag tasks to "Done" on Kanban board
+✅ Use card buttons to mark tasks complete and move them visually
     ↓
 🎉 Celebrate progress, no matter how small
 ```
@@ -137,7 +144,7 @@ The goal: reduce activation energy and maintain continuity in your academic work
 | **Start New Project** | Launch AI dialogue for project planning |
 | **Show Project Kanban Board** | Open visual project management |
 | **Show Welcome Guide** | Access comprehensive feature guide |
-| **Plan my dissertation with AI** | Generate structured dissertation plan |
+| **Plan my dissertation with AI** | Generate structured dissertation plan (auto-created for dissertation projects) |
 | **Add Micro Task** | Quick capture for 5-25 minute tasks |
 | **Toggle reminders** | Enable/disable proactive nudges |
 
@@ -178,11 +185,12 @@ The goal: reduce activation energy and maintain continuity in your academic work
 - Micro-task management
 
 ### ✅ Phase 2: ADHD-Optimized Features (Complete)
-- AI Project Initiation Dialogue
-- Academic Project Templates
-- Visual Kanban Boards
-- Enhanced Welcome Guide
-- Context preservation
+- AI Project Initiation Dialogue with smart project detection
+- Academic Project Templates (6 pre-built)
+- Interactive Visual Kanban Boards with full card management
+- Enhanced Welcome Guide and comprehensive testing
+- Context preservation and seamless project integration
+- Automatic AI planning for dissertation projects
 
 ### 🔄 Phase 3: Advanced Academic Features (In Progress)
 - Citation management integration

@@ -642,7 +642,7 @@ export class ProjectKanbanService {
 		return score;
 	}
 
-	private saveBoard(board: KanbanBoard): void {
+	public saveBoard(board: KanbanBoard): void {
 		this.boards.set(board.id, board);
 		// TODO: Persist to storage
 		console.log(`[Kanban] Saved board "${board.title}"`);
@@ -671,87 +671,257 @@ export class ProjectKanbanService {
 		const demoBoard: KanbanBoard = {
 			id: boardId,
 			projectId: 'demo-project',
-			title: 'Demo Project Board',
-			description: 'A sample Kanban board to demonstrate ADHD-friendly project management',
+			title: 'Digital Humanities PhD Chapter 3: "Social Media and Academic Identity"',
+			description: 'Third chapter of dissertation analyzing how academics construct professional identity on social media platforms',
 			columns: [
 				{
-					id: 'todo',
-					title: 'To Do',
-					description: 'Tasks ready to start',
+					id: 'planning',
+					title: '📋 Planning & Research',
+					description: 'Initial research and planning phase',
 					order: 0,
 					color: '#e3f2fd',
 					isCollapsed: false,
-					cardLimit: 5
+					cardLimit: 4
 				},
 				{
-					id: 'doing',
-					title: 'In Progress',
-					description: 'Currently working on',
+					id: 'data-collection',
+					title: '📊 Data Collection',
+					description: 'Gathering and organizing data',
 					order: 1,
+					color: '#f3e5f5',
+					isCollapsed: false,
+					cardLimit: 3
+				},
+				{
+					id: 'analysis',
+					title: '🔍 Analysis',
+					description: 'Analyzing collected data',
+					order: 2,
 					color: '#fff3e0',
 					isCollapsed: false,
 					cardLimit: 3
 				},
 				{
-					id: 'done',
-					title: 'Completed',
-					description: 'Finished tasks',
-					order: 2,
+					id: 'writing',
+					title: '✍️ Writing',
+					description: 'Drafting chapter sections',
+					order: 3,
 					color: '#e8f5e8',
+					isCollapsed: false,
+					cardLimit: 2
+				},
+				{
+					id: 'revision',
+					title: '📝 Revision',
+					description: 'Editing and polishing',
+					order: 4,
+					color: '#fce4ec',
+					isCollapsed: false,
+					cardLimit: 2
+				},
+				{
+					id: 'complete',
+					title: '✅ Complete',
+					description: 'Finished tasks',
+					order: 5,
+					color: '#e0f2f1',
 					isCollapsed: false
 				}
 			],
 			cards: [
+				// Planning & Research Phase
 				{
 					id: `${boardId}-card-1`,
-					title: 'Write thesis introduction',
-					description: 'Draft the first section of the introduction chapter',
-					columnId: 'todo',
+					title: 'Literature review: Academic identity theory',
+					description: 'Review existing literature on professional identity construction, focusing on Goffman and Butler',
+					columnId: 'complete',
 					order: 0,
-					status: 'not-started',
+					status: 'completed',
+					energyLevel: 'medium',
+					timeEstimate: {
+						optimistic: 120,
+						realistic: 180,
+						pessimistic: 300
+					},
+					actualTimeSpent: 165,
+					subtasks: [
+						{ id: 'lit-1', text: 'Search academic databases', status: 'done', order: 0, created: Date.now() - 7200000, updated: Date.now() - 7200000 },
+						{ id: 'lit-2', text: 'Read Goffman\'s "Presentation of Self"', status: 'done', order: 1, created: Date.now() - 3600000, updated: Date.now() - 3600000 },
+						{ id: 'lit-3', text: 'Take notes on Butler\'s performativity theory', status: 'done', order: 2, created: Date.now() - 1800000, updated: Date.now() - 1800000 },
+						{ id: 'lit-4', text: 'Create synthesis document', status: 'done', order: 3, created: Date.now() - 900000, updated: Date.now() - 900000 }
+					],
+					dependencies: [],
+					blockers: [],
+					tags: ['literature-review', 'theory', 'identity'],
+					priority: 'high',
+					dueDate: new Date(Date.now() - 86400000 * 2).toISOString(),
+					completionPercentage: 100,
+					estimatedPomodoros: 7,
+					adhdTips: ['Use citation manager to stay organized', 'Take breaks between dense theoretical texts'],
+					focusNotes: 'Pay special attention to how identity is performed vs. authentic',
+					created: Date.now() - 604800000,
+					updated: Date.now() - 86400000,
+					completed: Date.now() - 86400000
+				},
+				{
+					id: `${boardId}-card-2`,
+					title: 'Define research questions',
+					description: 'Formulate specific research questions for social media analysis',
+					columnId: 'data-collection',
+					order: 0,
+					status: 'in-progress',
 					energyLevel: 'high',
 					timeEstimate: {
 						optimistic: 45,
 						realistic: 90,
-						pessimistic: 150
+						pessimistic: 120
 					},
-					actualTimeSpent: 0,
-					subtasks: [],
-					dependencies: [],
+					actualTimeSpent: 30,
+					subtasks: [
+						{ id: 'rq-1', text: 'Brainstorm potential questions', status: 'done', order: 0, created: Date.now() - 3600000, updated: Date.now() - 3600000 },
+						{ id: 'rq-2', text: 'Narrow to 3-4 key questions', status: 'doing', order: 1, created: Date.now() - 1800000, updated: Date.now() - 1800000 },
+						{ id: 'rq-3', text: 'Validate with advisor', status: 'todo', order: 2, created: Date.now() - 900000, updated: Date.now() - 900000 }
+					],
+					dependencies: [`${boardId}-card-1`],
 					blockers: [],
-					tags: ['writing', 'introduction'],
+					tags: ['methodology', 'research-design'],
 					priority: 'high',
-					completionPercentage: 0,
+					dueDate: new Date(Date.now() + 86400000 * 3).toISOString(),
+					completionPercentage: 60,
 					estimatedPomodoros: 4,
-					adhdTips: ['Use timer for focused writing sessions', 'Take breaks every 25 minutes'],
-					focusNotes: '',
-					created: Date.now(),
-					updated: Date.now()
+					adhdTips: ['Start with broad questions, then narrow down', 'Use mind mapping to visualize connections'],
+					focusNotes: 'Remember to align with overall dissertation argument',
+					created: Date.now() - 259200000,
+					updated: Date.now() - 1800000,
+					started: Date.now() - 7200000
 				},
 				{
-					id: `${boardId}-card-2`,
-					title: 'Research methodology review',
-					description: 'Review and organize research methodology notes',
-					columnId: 'doing',
-					order: 0,
-					status: 'in-progress',
-					energyLevel: 'medium',
+					id: `${boardId}-card-3`,
+					title: 'Collect Twitter data sample',
+					description: 'Gather 200-300 tweets from academic accounts across different disciplines',
+					columnId: 'data-collection',
+					order: 1,
+					status: 'not-started',
+					energyLevel: 'low',
 					timeEstimate: {
-						optimistic: 30,
-						realistic: 60,
-						pessimistic: 90
+						optimistic: 60,
+						realistic: 120,
+						pessimistic: 180
 					},
-					actualTimeSpent: 25,
-					subtasks: [],
+					actualTimeSpent: 0,
+					subtasks: [
+						{ id: 'data-1', text: 'Set up data collection parameters', status: 'todo', order: 0, created: Date.now(), updated: Date.now() },
+						{ id: 'data-2', text: 'Identify target academic accounts', status: 'todo', order: 1, created: Date.now(), updated: Date.now() },
+						{ id: 'data-3', text: 'Export tweet data', status: 'todo', order: 2, created: Date.now(), updated: Date.now() },
+						{ id: 'data-4', text: 'Organize data in spreadsheet', status: 'todo', order: 3, created: Date.now(), updated: Date.now() }
+					],
+					dependencies: [`${boardId}-card-2`],
+					blockers: [],
+					tags: ['data-collection', 'social-media', 'twitter'],
+					priority: 'medium',
+					dueDate: new Date(Date.now() + 86400000 * 7).toISOString(),
+					completionPercentage: 0,
+					estimatedPomodoros: 5,
+					adhdTips: ['Set clear stopping points to avoid endless scrolling', 'Use timer to limit data collection sessions'],
+					focusNotes: 'Focus on variety across disciplines - STEM, humanities, social sciences',
+					created: Date.now() - 86400000,
+					updated: Date.now() - 86400000
+				},
+				{
+					id: `${boardId}-card-4`,
+					title: 'Code data for identity markers',
+					description: 'Identify and categorize identity performance elements in collected tweets',
+					columnId: 'analysis',
+					order: 0,
+					status: 'not-started',
+					energyLevel: 'high',
+					timeEstimate: {
+						optimistic: 180,
+						realistic: 300,
+						pessimistic: 480
+					},
+					actualTimeSpent: 0,
+					subtasks: [
+						{ id: 'code-1', text: 'Develop coding framework', status: 'todo', order: 0, created: Date.now(), updated: Date.now() },
+						{ id: 'code-2', text: 'Test coding on sample tweets', status: 'todo', order: 1, created: Date.now(), updated: Date.now() },
+						{ id: 'code-3', text: 'Code first 100 tweets', status: 'todo', order: 2, created: Date.now(), updated: Date.now() },
+						{ id: 'code-4', text: 'Code remaining tweets', status: 'todo', order: 3, created: Date.now(), updated: Date.now() },
+						{ id: 'code-5', text: 'Review and validate codes', status: 'todo', order: 4, created: Date.now(), updated: Date.now() }
+					],
+					dependencies: [`${boardId}-card-3`],
+					blockers: [],
+					tags: ['analysis', 'coding', 'qualitative'],
+					priority: 'high',
+					dueDate: new Date(Date.now() + 86400000 * 14).toISOString(),
+					completionPercentage: 0,
+					estimatedPomodoros: 12,
+					adhdTips: ['Break coding into smaller batches', 'Take breaks to maintain accuracy', 'Use coding software for consistency'],
+					focusNotes: 'Look for professional vs personal identity markers, institutional affiliations, expertise claims',
+					created: Date.now() - 43200000,
+					updated: Date.now() - 43200000
+				},
+				{
+					id: `${boardId}-card-5`,
+					title: 'Draft introduction section',
+					description: 'Write the opening 1000-1500 words introducing the chapter\'s focus and approach',
+					columnId: 'writing',
+					order: 0,
+					status: 'not-started',
+					energyLevel: 'high',
+					timeEstimate: {
+						optimistic: 90,
+						realistic: 150,
+						pessimistic: 240
+					},
+					actualTimeSpent: 0,
+					subtasks: [
+						{ id: 'intro-1', text: 'Create outline', status: 'todo', order: 0, created: Date.now(), updated: Date.now() },
+						{ id: 'intro-2', text: 'Write hook and context', status: 'todo', order: 1, created: Date.now(), updated: Date.now() },
+						{ id: 'intro-3', text: 'Draft research questions', status: 'todo', order: 2, created: Date.now(), updated: Date.now() },
+						{ id: 'intro-4', text: 'Write methodology preview', status: 'todo', order: 3, created: Date.now(), updated: Date.now() },
+						{ id: 'intro-5', text: 'First revision pass', status: 'todo', order: 4, created: Date.now(), updated: Date.now() }
+					],
+					dependencies: [`${boardId}-card-2`],
+					blockers: [],
+					tags: ['writing', 'introduction', 'draft'],
+					priority: 'medium',
+					dueDate: new Date(Date.now() + 86400000 * 21).toISOString(),
+					completionPercentage: 0,
+					estimatedPomodoros: 6,
+					adhdTips: ['Start with terrible first draft', 'Use Pomodoro technique for focused writing', 'Don\'t edit while drafting'],
+					focusNotes: 'Connect to previous chapters, establish stakes for this analysis',
+					created: Date.now() - 21600000,
+					updated: Date.now() - 21600000
+				},
+				{
+					id: `${boardId}-card-6`,
+					title: 'Schedule advisor meeting',
+					description: 'Set up meeting to discuss chapter progress and get feedback on direction',
+					columnId: 'planning',
+					order: 1,
+					status: 'not-started',
+					energyLevel: 'low',
+					timeEstimate: {
+						optimistic: 10,
+						realistic: 20,
+						pessimistic: 45
+					},
+					actualTimeSpent: 0,
+					subtasks: [
+						{ id: 'meeting-1', text: 'Check advisor\'s calendar', status: 'todo', order: 0, created: Date.now(), updated: Date.now() },
+						{ id: 'meeting-2', text: 'Prepare agenda', status: 'todo', order: 1, created: Date.now(), updated: Date.now() },
+						{ id: 'meeting-3', text: 'Send meeting request', status: 'todo', order: 2, created: Date.now(), updated: Date.now() }
+					],
 					dependencies: [],
 					blockers: [],
-					tags: ['research', 'methodology'],
+					tags: ['admin', 'advisor', 'meeting'],
 					priority: 'medium',
-					completionPercentage: 40,
-					estimatedPomodoros: 3,
-					adhdTips: ['Use mind maps to organize concepts', 'Color-code different themes'],
-					focusNotes: 'Focus on qualitative vs quantitative approaches',
-					created: Date.now() - 86400000,
+					dueDate: new Date(Date.now() + 86400000 * 2).toISOString(),
+					completionPercentage: 0,
+					estimatedPomodoros: 1,
+					adhdTips: ['Do this when energy is low but time is available', 'Prepare specific questions in advance'],
+					focusNotes: 'Ask about: research questions validity, data collection approach, chapter structure',
+					created: Date.now(),
 					updated: Date.now()
 				}
 			],
@@ -761,18 +931,65 @@ export class ProjectKanbanService {
 				showEnergyLevels: true,
 				enableDragDrop: true,
 				autoArchiveCompleted: false,
-				maxCardsPerColumn: 10,
+				maxCardsPerColumn: 4,
 				focusMode: 'all'
 			},
-			totalCards: 2,
-			completedCards: 0,
-			totalEstimatedHours: 2.5,
-			actualTimeSpent: 0.42, // 25 minutes in hours
-			created: Date.now(),
+			totalCards: 6,
+			completedCards: 1,
+			totalEstimatedHours: 13.5,
+			actualTimeSpent: 3.25, // 195 minutes in hours
+			created: Date.now() - 604800000,
 			updated: Date.now()
 		};
 
 		this.boards.set(boardId, demoBoard);
 		return demoBoard;
+	}
+
+	/**
+	 * Create a quick card for immediate editing
+	 */
+	public createQuickCard(
+		boardId: string,
+		columnId: string,
+		title: string,
+		description: string = ''
+	): KanbanCard | null {
+		const board = this.boards.get(boardId);
+		if (!board) return null;
+
+		const cardId = `${boardId}-card-${Date.now()}`;
+		const newCard: KanbanCard = {
+			id: cardId,
+			title,
+			description,
+			columnId,
+			order: board.cards.filter(c => c.columnId === columnId).length,
+			status: 'not-started',
+			energyLevel: 'medium',
+			timeEstimate: {
+				optimistic: 15,
+				realistic: 30,
+				pessimistic: 45
+			},
+			actualTimeSpent: 0,
+			subtasks: [],
+			dependencies: [],
+			blockers: [],
+			tags: [],
+			priority: 'medium',
+			completionPercentage: 0,
+			estimatedPomodoros: 1,
+			adhdTips: [],
+			focusNotes: '',
+			created: Date.now(),
+			updated: Date.now()
+		};
+
+		board.cards.push(newCard);
+		board.totalCards = board.cards.length;
+		this.saveBoard(board);
+		
+		return newCard;
 	}
 }

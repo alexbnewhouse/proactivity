@@ -1,7 +1,7 @@
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'ts-jest',
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom', // Changed from 'node' to support DOM testing
   
   // Simple test discovery
   testMatch: ['**/tests/**/*.test.ts'],

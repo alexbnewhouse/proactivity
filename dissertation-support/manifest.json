@@ -1,9 +1,9 @@
 {
   "id": "dissertation-support",
   "name": "Dissertation Support",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "minAppVersion": "0.15.0",
-  "description": "ADHD-friendly dissertation support with proactive reminders and AI-powered planning",
+  "description": "ADHD-friendly dissertation support with proactive reminders, AI-powered planning, and interactive project management",
   "author": "Alex Newhouse",
   "authorUrl": "https://github.com/alexbnewhouse",
   "fundingUrl": "https://github.com/sponsors/alexbnewhouse",
