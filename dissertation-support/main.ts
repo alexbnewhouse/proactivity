@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, Modal } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, Modal, Menu, ItemView, WorkspaceLeaf } from 'obsidian';
 
 // ADHD-Friendly Services
 import { StorageService } from './src/storage-service';
@@ -7,7 +7,9 @@ import { PlanningService } from './src/planning-service';
 import { TaskService } from './src/task-service';
 import { ProjectDialogueService } from './src/project-dialogue-service';
 import { AcademicTemplateService } from './src/academic-templates';
+import { ProjectKanbanService } from './src/kanban-service';
 import { validateSettings, Settings as ValidatedSettings } from './src/settings-schema';
+import { KanbanView, KANBAN_VIEW_TYPE } from './src/kanban-view';
 
 interface LastContext {
 	title: string; // brief description or heading user was working on
@@ -69,6 +71,7 @@ interface DissertationSupportSettings {
   lastTipDate?: string; // YYYY-MM-DD last auto-shown date
   nextTipIndex?: number; // index into tip array
 	tipFrequency?: 'daily' | 'every-launch' | 'manual'; // when to auto show
+	firstRunCompleted?: boolean; // track if user has seen welcome guide
 	featureUsage?: {
 		savedContext?: boolean;
 		createdPlan?: boolean;
@@ -98,6 +101,7 @@ const DEFAULT_SETTINGS: DissertationSupportSettings = {
   lastTipDate: '',
   nextTipIndex: 0,
 	tipFrequency: 'daily',
+	firstRunCompleted: false,
 	featureUsage: {},
 }
 
@@ -112,15 +116,28 @@ export default class DissertationSupportPlugin extends Plugin {
 	private taskService: TaskService;
 	private projectDialogueService: ProjectDialogueService;
 	private academicTemplateService: AcademicTemplateService;
+	public projectKanbanService: ProjectKanbanService;
 
 	async onload() {
 		await this.loadSettings();
 
+		// Register the welcome guide view
+		this.registerView(
+			WELCOME_GUIDE_VIEW_TYPE,
+			(leaf) => new WelcomeGuideView(leaf)
+		);
+
+		// Register the kanban board view
+		this.registerView(
+			KANBAN_VIEW_TYPE,
+			(leaf) => new KanbanView(leaf, this)
+		);
+
 		// Stylesheet is static (styles.css) and auto-loaded by Obsidian when present.
 
 		// Add ribbon icon
-		this.addRibbonIcon('brain', 'Dissertation Support', () => {
-			this.showQuickStart();
+		this.addRibbonIcon('brain', 'Dissertation Support', (event) => {
+			this.showMainMenu(event);
 		});
 
 		// Add command for AI planning
@@ -169,6 +186,33 @@ export default class DissertationSupportPlugin extends Plugin {
 			name: 'Toggle proactive reminders',
 			callback: () => {
 				this.toggleReminders();
+			}
+		});
+
+		// Add command to show welcome guide
+		this.addCommand({
+			id: 'show-welcome-guide',
+			name: 'Show Welcome Guide',
+			callback: async () => {
+				await this.activateWelcomeGuideView();
+			}
+		});
+
+		// Add command to show kanban board
+		this.addCommand({
+			id: 'show-kanban-board',
+			name: 'Show Project Kanban Board',
+			callback: async () => {
+				await this.activateKanbanView();
+			}
+		});
+
+		// Add command to start new project
+		this.addCommand({
+			id: 'start-new-project',
+			name: 'Start New Project',
+			callback: () => {
+				this.startNewProject();
 			}
 		});
 
@@ -382,6 +426,68 @@ export default class DissertationSupportPlugin extends Plugin {
 
 		console.log('Dissertation Support Plugin loaded');
 
+		// Show welcome guide on first run
+		this.checkFirstRun();
+	}
+
+	/** Activate the Welcome Guide view in the sidebar */
+	async activateWelcomeGuideView(): Promise<void> {
+		const { workspace } = this.app;
+
+		let leaf: WorkspaceLeaf | null = null;
+		const leaves = workspace.getLeavesOfType(WELCOME_GUIDE_VIEW_TYPE);
+
+		if (leaves.length > 0) {
+			// A welcome guide view already exists, use it
+			leaf = leaves[0];
+		} else {
+			// Create a new welcome guide view in the right sidebar
+			leaf = workspace.getRightLeaf(false);
+			if (leaf) {
+				await leaf.setViewState({ type: WELCOME_GUIDE_VIEW_TYPE, active: true });
+			}
+		}
+
+		// Reveal the leaf
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	/** Activate the Kanban Board view in the sidebar */
+	async activateKanbanView(): Promise<void> {
+		const { workspace } = this.app;
+
+		let leaf: WorkspaceLeaf | null = null;
+		const leaves = workspace.getLeavesOfType(KANBAN_VIEW_TYPE);
+
+		if (leaves.length > 0) {
+			// A kanban view already exists, use it
+			leaf = leaves[0];
+		} else {
+			// Create a new kanban view in the right sidebar
+			leaf = workspace.getRightLeaf(false);
+			if (leaf) {
+				await leaf.setViewState({ type: KANBAN_VIEW_TYPE, active: true });
+			}
+		}
+
+		// Reveal the leaf
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	/** Check if this is the first run and show welcome guide */
+	private async checkFirstRun() {
+		if (!this.settings.firstRunCompleted) {
+			// Small delay to let UI settle, then open welcome guide
+			setTimeout(async () => {
+				await this.activateWelcomeGuideView();
+				this.settings.firstRunCompleted = true;
+				this.saveSettings();
+			}, 1000);
+		}
 	}
 
 	/** Capture active editor context and store as lastContext */
@@ -790,6 +896,9 @@ export default class DissertationSupportPlugin extends Plugin {
 			// AcademicTemplateService: ADHD-friendly academic project templates
 			this.academicTemplateService = new AcademicTemplateService();
 
+			// ProjectKanbanService: Visual project management with ADHD-friendly features
+			this.projectKanbanService = new ProjectKanbanService(this.taskService);
+
 			// ProjectDialogueService: AI-driven project initiation dialogue
 			this.projectDialogueService = new ProjectDialogueService(this.aiService, this.taskService, this.academicTemplateService);
 
@@ -894,6 +1003,65 @@ export default class DissertationSupportPlugin extends Plugin {
 		
 		// Also log to console for debugging
 		console.log('Proactive reminder shown:', message);
+	}
+
+	showMainMenu(event: MouseEvent) {
+		const menu = new Menu();
+		
+		menu.addItem((item) => {
+			item.setTitle("🚀 Start New Project")
+				.setIcon("plus")
+				.onClick(() => {
+					this.startNewProject();
+				});
+		});
+
+		menu.addItem((item) => {
+			item.setTitle("📚 Welcome Guide")
+				.setIcon("help-circle")
+				.onClick(async () => {
+					await this.activateWelcomeGuideView();
+				});
+		});
+
+		menu.addItem((item) => {
+			item.setTitle("📋 Project Kanban Board")
+				.setIcon("kanban-square")
+				.onClick(async () => {
+					await this.activateKanbanView();
+				});
+		});
+
+		menu.addSeparator();
+
+		menu.addItem((item) => {
+			item.setTitle("🎯 Focus Panel")
+				.setIcon("target")
+				.onClick(() => {
+					this.showFocusPanel();
+				});
+		});
+
+		menu.addItem((item) => {
+			item.setTitle("🤖 AI Planning")
+				.setIcon("brain")
+				.onClick(() => {
+					this.runAIPlanning('dissertation');
+				});
+		});
+
+		menu.addSeparator();
+
+		menu.addItem((item) => {
+			item.setTitle("⚙️ Settings")
+				.setIcon("settings")
+				.onClick(() => {
+					(this.app as any).setting.open();
+					(this.app as any).setting.openTabById('dissertation-support');
+				});
+		});
+
+		menu.showAtMouseEvent(event);
 	}
 
 	showQuickStart() {
@@ -1994,4 +2162,308 @@ function escapeHtml(str: string): string {
 			default: return ch;
 		}
 	});
+}
+
+// Welcome Guide View Type
+export const WELCOME_GUIDE_VIEW_TYPE = 'dissertation-support-welcome-guide';
+
+class WelcomeGuideView extends ItemView {
+	constructor(leaf: WorkspaceLeaf) {
+		super(leaf);
+	}
+
+	getViewType() {
+		return WELCOME_GUIDE_VIEW_TYPE;
+	}
+
+	getDisplayText() {
+		return '🧠 ADHD Guide';
+	}
+
+	getIcon() {
+		return 'help-circle';
+	}
+
+	async onOpen() {
+		const container = this.containerEl.children[1];
+		container.empty();
+		container.addClass('ds-welcome-guide-view');
+		
+		// Header
+		const header = container.createDiv({ cls: 'ds-welcome-header' });
+		header.createEl('h1', { text: '🧠 Dissertation Support Guide' });
+		header.createDiv({ 
+			text: 'ADHD-friendly academic productivity system',
+			cls: 'ds-welcome-subtitle'
+		});
+
+		// Navigation tabs
+		const tabContainer = container.createDiv({ cls: 'ds-welcome-tabs' });
+		const tabs = [
+			{ id: 'quickstart', label: '🚀 Quick Start', icon: '🚀' },
+			{ id: 'features', label: '🎯 Features', icon: '🎯' },
+			{ id: 'commands', label: '⌨️ Commands', icon: '⌨️' },
+			{ id: 'tips', label: '💡 ADHD Tips', icon: '💡' }
+		];
+
+		const contentContainer = container.createDiv({ cls: 'ds-welcome-content' });
+		let activeTab = 'quickstart';
+
+		tabs.forEach(tab => {
+			const tabBtn = tabContainer.createEl('button', {
+				text: tab.label,
+				cls: `ds-welcome-tab ${tab.id === activeTab ? 'active' : ''}`
+			});
+			tabBtn.addEventListener('click', () => {
+				// Update active tab
+				tabContainer.querySelectorAll('.ds-welcome-tab').forEach(t => t.removeClass('active'));
+				tabBtn.addClass('active');
+				activeTab = tab.id;
+				this.renderTabContent(contentContainer, tab.id);
+			});
+		});
+
+		// Render initial content
+		this.renderTabContent(contentContainer, activeTab);
+
+		// Footer actions
+		const footer = container.createDiv({ cls: 'ds-welcome-footer' });
+		const startBtn = footer.createEl('button', {
+			text: '🚀 Start First Project',
+			cls: 'ds-primary-button'
+		});
+		startBtn.addEventListener('click', () => {
+			// Trigger the project dialogue
+			(this.app as any).commands.executeCommandById('dissertation-support:start-new-project');
+		});
+
+		const settingsBtn = footer.createEl('button', {
+			text: '⚙️ Open Settings',
+			cls: 'ds-secondary-button'
+		});
+		settingsBtn.addEventListener('click', () => {
+			(this.app as any).setting.open();
+			(this.app as any).setting.openTabById('dissertation-support');
+		});
+	}
+
+	private renderTabContent(container: HTMLElement, tabId: string) {
+		container.empty();
+
+		switch (tabId) {
+			case 'quickstart':
+				this.renderQuickStartTab(container);
+				break;
+			case 'features':
+				this.renderFeaturesTab(container);
+				break;
+			case 'commands':
+				this.renderCommandsTab(container);
+				break;
+			case 'tips':
+				this.renderTipsTab(container);
+				break;
+		}
+	}
+
+	private renderQuickStartTab(container: HTMLElement) {
+		const content = container.createDiv({ cls: 'ds-tab-content' });
+		
+		content.createEl('h2', { text: '🚀 Get Started in 5 Minutes' });
+		
+		const steps = [
+			{
+				title: '1. Basic Setup',
+				items: [
+					'Plugin is auto-activated ✅',
+					'Go to Settings → Dissertation Support',
+					'Add your OpenAI API Key'
+				]
+			},
+			{
+				title: '2. Start Your First Project',
+				items: [
+					'Click the 🧠 Brain icon in the ribbon',
+					'Answer 5-7 conversational questions',
+					'Choose from ADHD-optimized templates',
+					'Get immediate micro-tasks (5-25 minutes each)'
+				]
+			},
+			{
+				title: '3. Work ADHD-Smart',
+				items: [
+					'Focus on 2-3 micro-tasks today',
+					'Use the task board: Todo → Doing → Done',
+					'Celebrate small wins 🎉',
+					'Let proactive reminders guide you'
+				]
+			}
+		];
+
+		steps.forEach(step => {
+			const stepEl = content.createDiv({ cls: 'ds-step' });
+			stepEl.createEl('h3', { text: step.title });
+			const list = stepEl.createEl('ul');
+			step.items.forEach(item => {
+				list.createEl('li', { text: item });
+			});
+		});
+
+		// Quick actions
+		const actionsDiv = content.createDiv({ cls: 'ds-quick-actions' });
+		actionsDiv.createEl('h3', { text: '⚡ Quick Actions' });
+		
+		const actionBtn = actionsDiv.createEl('button', {
+			text: '🚀 Start New Project Now',
+			cls: 'ds-action-button'
+		});
+		actionBtn.addEventListener('click', () => {
+			(this.app as any).commands.executeCommandById('dissertation-support:start-new-project');
+		});
+	}
+
+	private renderFeaturesTab(container: HTMLElement) {
+		const content = container.createDiv({ cls: 'ds-tab-content' });
+		
+		content.createEl('h2', { text: '🎯 Core Features' });
+
+		const features = [
+			{
+				icon: '🤖',
+				title: 'AI Project Dialogue',
+				desc: 'Conversational project planning that breaks down overwhelming tasks into manageable steps'
+			},
+			{
+				icon: '📋',
+				title: 'Academic Templates',
+				desc: '6 pre-built templates (dissertation, paper, proposal, etc.) with ADHD-optimized task sequences'
+			},
+			{
+				icon: '✅',
+				title: 'Micro-Task Board',
+				desc: 'Today-focused task management with 5-25 minute chunks to prevent overwhelm'
+			},
+			{
+				icon: '⏰',
+				title: 'Proactive Reminders',
+				desc: 'Gentle, context-aware nudges to maintain momentum without being overwhelming'
+			},
+			{
+				icon: '🎯',
+				title: 'Focus Panel',
+				desc: 'Distraction-free workspace for deep work sessions with built-in timers'
+			},
+			{
+				icon: '📊',
+				title: 'Progress Tracking',
+				desc: 'Visual progress indicators and automatic resume cards in daily notes'
+			}
+		];
+
+		features.forEach(feature => {
+			const featureEl = content.createDiv({ cls: 'ds-feature' });
+			featureEl.createEl('div', { text: feature.icon, cls: 'ds-feature-icon' });
+			const textDiv = featureEl.createDiv({ cls: 'ds-feature-text' });
+			textDiv.createEl('h4', { text: feature.title });
+			textDiv.createEl('p', { text: feature.desc });
+		});
+	}
+
+	private renderCommandsTab(container: HTMLElement) {
+		const content = container.createDiv({ cls: 'ds-tab-content' });
+		
+		content.createEl('h2', { text: '⌨️ Commands & Shortcuts' });
+
+		const commands = [
+			{ name: 'Start New Project', shortcut: 'Ctrl/Cmd+P → Search', desc: 'Launch AI project dialogue' },
+			{ name: 'Plan dissertation with AI', shortcut: 'Command Palette', desc: 'Full dissertation planning' },
+			{ name: 'Focus on today\'s plan', shortcut: 'Command Palette', desc: 'Open focus workspace' },
+			{ name: 'Toggle reminders', shortcut: 'Command Palette', desc: 'Turn proactive nudges on/off' },
+			{ name: 'Insert resume card', shortcut: 'Command Palette', desc: 'Add progress summary to daily note' }
+		];
+
+		const table = content.createEl('table', { cls: 'ds-commands-table' });
+		const header = table.createEl('thead');
+		const headerRow = header.createEl('tr');
+		headerRow.createEl('th', { text: 'Command' });
+		headerRow.createEl('th', { text: 'Access' });
+		headerRow.createEl('th', { text: 'Description' });
+
+		const tbody = table.createEl('tbody');
+		commands.forEach(cmd => {
+			const row = tbody.createEl('tr');
+			row.createEl('td', { text: cmd.name, cls: 'ds-cmd-name' });
+			row.createEl('td', { text: cmd.shortcut, cls: 'ds-cmd-shortcut' });
+			row.createEl('td', { text: cmd.desc });
+		});
+
+		// Ribbon info
+		const ribbonSection = content.createDiv({ cls: 'ds-ribbon-info' });
+		ribbonSection.createEl('h3', { text: '🧠 Ribbon Icon' });
+		ribbonSection.createEl('p', { text: 'Click the Brain icon in the left ribbon for quick access to project initiation and main features.' });
+	}
+
+	private renderTipsTab(container: HTMLElement) {
+		const content = container.createDiv({ cls: 'ds-tab-content' });
+		
+		content.createEl('h2', { text: '🧠 ADHD-Specific Tips' });
+
+		const categories = [
+			{
+				title: '🎯 Getting Started Right',
+				tips: [
+					'Start with ONE project, not everything at once',
+					'Use templates - don\'t reinvent the wheel',
+					'Answer dialogue questions honestly',
+					'Celebrate completing your first 2-3 micro-tasks'
+				]
+			},
+			{
+				title: '⚡ Maintaining Momentum',
+				tips: [
+					'Check your resume card each morning',
+					'Match high-energy tasks to when you feel alert',
+					'Break tasks down if they feel too big',
+					'Use focus mode to minimize distractions'
+				]
+			},
+			{
+				title: '🧠 Working with ADHD Brain',
+				tips: [
+					'Don\'t over-plan - start with templates, customize later',
+					'Forgive breaks - re-entry is built in, just restart',
+					'Use the visual task board actively',
+					'Share your progress with accountability partners'
+				]
+			}
+		];
+
+		categories.forEach(category => {
+			const categoryEl = content.createDiv({ cls: 'ds-tip-category' });
+			categoryEl.createEl('h3', { text: category.title });
+			const list = categoryEl.createEl('ul');
+			category.tips.forEach(tip => {
+				list.createEl('li', { text: tip });
+			});
+		});
+
+		// Executive function support
+		const execSection = content.createDiv({ cls: 'ds-exec-support' });
+		execSection.createEl('h3', { text: '🎛️ Executive Function Support' });
+		execSection.createEl('p', { text: 'This plugin is specifically designed to support:'});
+		
+		const supportList = execSection.createEl('ul');
+		[
+			'Working memory (visual progress, saved context)',
+			'Task initiation (pre-structured templates)',
+			'Attention regulation (focus mode, time limits)',
+			'Emotional regulation (celebration of wins)'
+		].forEach(item => {
+			supportList.createEl('li', { text: item });
+		});
+	}
+
+	async onClose() {
+		// Clean up
+	}
 }
