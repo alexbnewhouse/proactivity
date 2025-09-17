@@ -1078,6 +1078,20 @@ export default class DissertationSupportPlugin extends Plugin {
 		if (this.taskService) {
 			this.settings.dailyTasks = this.taskService.getTasksData();
 		}
+		
+		// Update AI service configuration when API key changes
+		if (this.aiService) {
+			const aiProvider: AIProvider = {
+				name: this.settings.openaiApiKey ? 'openai' : 'local',
+				apiKey: this.settings.openaiApiKey,
+				maxTokens: 2000,
+				temperature: 0.7,
+			};
+			
+			this.aiService.updateConfiguration({
+				defaultProvider: aiProvider,
+			});
+		}
 	}
 
 	startProactiveReminders() {

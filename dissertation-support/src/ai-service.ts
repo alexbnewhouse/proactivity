@@ -57,6 +57,27 @@ export class AIService {
   }
 
   /**
+   * Update the AI service configuration (e.g., when API key changes)
+   * ADHD-friendly: Allow configuration updates without recreating service
+   */
+  updateConfiguration(updates: Partial<AIServiceConfig>): void {
+    this.config = {
+      ...this.config,
+      ...updates,
+    };
+    
+    // Reset retry count when configuration changes
+    this.retryCount = 0;
+    
+    if (this.config.enableLogging) {
+      console.log('[AIService] Configuration updated:', {
+        provider: this.config.defaultProvider.name,
+        hasApiKey: !!this.config.defaultProvider.apiKey,
+      });
+    }
+  }
+
+  /**
    * Generate plan content using AI
    * ADHD-friendly: Clear feedback, graceful errors, fast failure
    */
