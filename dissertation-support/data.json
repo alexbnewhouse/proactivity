@@ -1,0 +1,52 @@
+{
+  "reminderInterval": 60,
+  "openaiApiKey": "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",
+  "dissertationTopic": "Collective political behavior and epistemic collapse in online communities",
+  "deadline": "May 2027",
+  "prospectusDeadline": "December 2025",
+  "planOutputFolder": "",
+  "lastPlans": {},
+  "lastReminderTime": 1758080813477,
+  "isReminderActive": true,
+  "notionStyleEnabled": true,
+  "dailyTasks": {
+    "2025-09-16": []
+  },
+  "tipsEnabled": true,
+  "tipsDismissed": false,
+  "lastTipDate": "2025-09-17",
+  "nextTipIndex": 4,
+  "tipFrequency": "daily",
+  "featureUsage": {},
+  "hasSeenWelcome": true,
+  "lastContext": {
+    "title": "todos",
+    "filePath": "todos.md",
+    "line": 3,
+    "updated": 1758052556778
+  },
+  "lastDailyPlan": {
+    "date": "2025-09-17",
+    "suggestions": [
+      {
+        "id": "2025-09-17-0",
+        "text": "Open the note: todos",
+        "done": false
+      },
+      {
+        "id": "2025-09-17-1",
+        "text": "Skim last 3 paragraphs",
+        "done": false
+      },
+      {
+        "id": "2025-09-17-2",
+        "text": "Clarify one sentence",
+        "done": false
+      }
+    ],
+    "firstAction": "",
+    "stopPoint": "",
+    "created": 1758123856010,
+    "lastUpdated": 1758123856010
+  }
+}

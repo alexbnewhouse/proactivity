@@ -1,12 +1,81 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, TFile, Modal } from 'obsidian';
 
+// ADHD-Friendly Services
+import { StorageService } from './src/storage-service';
+import { AIService, AIProvider } from './src/ai-service';
+import { PlanningService } from './src/planning-service';
+import { TaskService } from './src/task-service';
+import { validateSettings, Settings as ValidatedSettings } from './src/settings-schema';
+
+interface LastContext {
+	title: string; // brief description or heading user was working on
+	filePath: string; // vault path to note
+	line: number; // approximate line number (cursor position)
+	updated: number; // epoch ms
+}
+
+interface DailyPlanSuggestion {
+	id: string;
+	text: string;
+	done: boolean;
+}
+
+interface DailyPlan {
+	date: string; // YYYY-MM-DD
+	suggestions: DailyPlanSuggestion[]; // up to 3 tiny actions
+	firstAction: string; // user input
+	stopPoint: string; // user planned stop point
+	created: number; // epoch ms
+	lastUpdated: number; // epoch ms
+}
+
+// --- Task Board (Phase 2+) ---
+type MicroTaskStatus = 'todo' | 'doing' | 'done';
+
+interface MicroTask {
+  id: string;            // unique (date + random)
+  text: string;          // short actionable micro-task
+  status: MicroTaskStatus; // lifecycle state
+  order: number;         // ordering within the day board
+  created: number;       // epoch ms
+  updated: number;       // epoch ms
+}
+
+// Record keyed by date (YYYY-MM-DD) storing that day's micro tasks
+interface DailyTasksRecord {
+  [date: string]: MicroTask[];
+}
+
 interface DissertationSupportSettings {
 	reminderInterval: number; // minutes
 	openaiApiKey: string;
 	dissertationTopic: string;
 	deadline: string;
+	prospectusDeadline?: string; // separate deadline for prospectus planning
+	planOutputFolder?: string; // folder to create plan files in
+	targetWordCount?: number; // optional total target word count for dissertation
+	lastPlans?: { [k in 'dissertation' | 'prospectus']?: { file: string; created: string; daysRemaining: number | null } };
 	lastReminderTime: number;
 	isReminderActive: boolean;
+	lastContext?: LastContext; // optional until user saves first context
+	notionStyleEnabled: boolean; // enable enhanced Notion-like styling
+	lastDailyPlan?: DailyPlan; // auto-generated daily focus
+  dailyTasks?: DailyTasksRecord; // micro-task board keyed by date
+  // Onboarding tips
+  tipsEnabled?: boolean; // master toggle for rotating tips
+  tipsDismissed?: boolean; // permanently disabled by user
+  lastTipDate?: string; // YYYY-MM-DD last auto-shown date
+  nextTipIndex?: number; // index into tip array
+	tipFrequency?: 'daily' | 'every-launch' | 'manual'; // when to auto show
+	featureUsage?: {
+		savedContext?: boolean;
+		createdPlan?: boolean;
+		createdDelta?: boolean;
+		createdMicroTask?: boolean;
+		seededFromPlan?: boolean;
+		openedFocusPanel?: boolean;
+		toggledReminders?: boolean;
+	};
 }
 
 const DEFAULT_SETTINGS: DissertationSupportSettings = {
@@ -14,16 +83,36 @@ const DEFAULT_SETTINGS: DissertationSupportSettings = {
 	openaiApiKey: '',
 	dissertationTopic: '',
 	deadline: '',
+	prospectusDeadline: '',
+	planOutputFolder: '',
+	targetWordCount: undefined,
+	lastPlans: {},
 	lastReminderTime: 0,
-	isReminderActive: true
+	isReminderActive: true,
+	notionStyleEnabled: true,
+	dailyTasks: {},
+  tipsEnabled: true,
+  tipsDismissed: false,
+  lastTipDate: '',
+  nextTipIndex: 0,
+	tipFrequency: 'daily',
+	featureUsage: {},
 }
 
 export default class DissertationSupportPlugin extends Plugin {
 	settings: DissertationSupportSettings;
 	reminderInterval: NodeJS.Timeout | null = null;
 
+	// ADHD-Friendly Services - Dependency Injection
+	private storageService: StorageService;
+	private aiService: AIService;
+	private planningService: PlanningService;
+	private taskService: TaskService;
+
 	async onload() {
 		await this.loadSettings();
+
+		// Stylesheet is static (styles.css) and auto-loaded by Obsidian when present.
 
 		// Add ribbon icon
 		this.addRibbonIcon('brain', 'Dissertation Support', () => {
@@ -35,7 +124,38 @@ export default class DissertationSupportPlugin extends Plugin {
 			id: 'ai-plan-dissertation',
 			name: 'Plan my dissertation with AI',
 			callback: () => {
-				this.runAIPlanning();
+				this.runAIPlanning('dissertation');
+			}
+		});
+
+		this.addCommand({
+			id: 'ai-plan-dissertation-delta',
+			name: 'Update dissertation plan (delta)',
+			callback: () => this.runAIPlanningDelta('dissertation')
+		});
+
+		// Add command for prospectus planning
+		this.addCommand({
+			id: 'ai-plan-prospectus',
+			name: 'Plan my prospectus with AI',
+			callback: () => {
+				this.runAIPlanning('prospectus');
+			}
+		});
+
+		this.addCommand({
+			id: 'ai-plan-prospectus-delta',
+			name: 'Update prospectus plan (delta)',
+			callback: () => this.runAIPlanningDelta('prospectus')
+		});
+
+		// Command: Show Today's Focus Panel (micro-plan)
+		this.addCommand({
+			id: 'show-today-focus-panel',
+			name: "Show Today's Focus Panel",
+			callback: () => {
+				this.ensureTodayPlan();
+				this.showFocusPanel();
 			}
 		});
 
@@ -51,10 +171,513 @@ export default class DissertationSupportPlugin extends Plugin {
 		// Add settings tab
 		this.addSettingTab(new DissertationSettingTab(this.app, this));
 
+		// Command: Insert/Update resume card in today's daily note
+		this.addCommand({
+			id: 'insert-resume-card',
+			name: 'Insert Resume Card in Today\'s Daily Note',
+			callback: () => this.upsertResumeCardInDailyNote()
+		});
+
+		// Command: Save current context (manual capture)
+		this.addCommand({
+			id: 'save-current-dissertation-context',
+			name: 'Save Current Dissertation Context',
+			callback: () => {
+				this.captureCurrentContext();
+			}
+		});
+
+		// Command: Add Micro Task
+		this.addCommand({
+			id: 'add-micro-task',
+			name: 'Add Micro Task',
+			callback: () => {
+				new AddMicroTaskModal(this.app, this, (text) => {
+					this.createMicroTask(text);
+					this.upsertTaskBoardInDailyNote(true);
+				}).open();
+			}
+		});
+
+		// Command: Seed micro tasks from last plan
+		this.addCommand({
+			id: 'seed-micro-tasks-from-plan',
+			name: 'Seed micro tasks from last plan',
+			callback: () => this.seedMicroTasksFromLastPlan()
+		});
+
+		// Command: Show onboarding tip
+		this.addCommand({
+			id: 'show-onboarding-tip',
+			name: 'Show Onboarding Tip',
+			callback: () => this.showNextOnboardingTip(false)
+		});
+
+
 		// Start proactive reminders
 		this.startProactiveReminders();
 
+		// Auto-upsert resume card if we already have context & user enabled style
+		if (this.settings.lastContext && this.settings.notionStyleEnabled) {
+			this.upsertResumeCardInDailyNote();
+		}
+
+		// Generate a new daily plan if date changed
+		this.ensureTodayPlan();
+
+		// Status bar item
+		this.initStatusBar();
+
+		// Auto show one tip per day after initial UI setup
+		this.showNextOnboardingTip(true);
+
+		// Markdown post processor for resume card interactions
+		this.registerMarkdownPostProcessor((el, ctx) => {
+			// Support both old .ds-resume-card and new .ds-resume-card-wrapper
+			const wrappers: Element[] = Array.from(el.querySelectorAll('.ds-resume-card-wrapper, .ds-resume-card'));
+			if (!wrappers.length) return;
+			wrappers.forEach(card => {
+				const button = card.querySelector('.ds-resume-btn');
+				if (!button) return;
+				if ((button as any)._dsBound) return; // prevent duplicate binding
+				(button as any)._dsBound = true;
+				button.addEventListener('click', async () => {
+					const filePath = card.getAttribute('data-file');
+					const lineStr = card.getAttribute('data-line');
+					if (!filePath) return;
+					// @ts-ignore
+					await this.app.workspace.openLinkText(filePath, '/', false);
+					if (lineStr) {
+						setTimeout(() => {
+							// @ts-ignore
+							const leaf = this.app.workspace.activeLeaf;
+							if (leaf && (leaf as any).view && (leaf as any).view.editor) {
+								(leaf as any).view.editor.setCursor({ line: parseInt(lineStr, 10), ch: 0 });
+							}
+						}, 180);
+					}
+					new Notice('🎯 Resumed where you left off');
+				});
+			});
+		});
+
+		// Global delegated click handler (covers Live Preview, later dynamic loads)
+		const delegated = async (ev: Event) => {
+			const target = ev.target as HTMLElement;
+			if (!target) return;
+			// Plan actions
+			if (target.closest('.ds-plan-seed-btn')) {
+				this.seedMicroTasksFromLastPlan();
+				return;
+			}
+			if (target.closest('.ds-plan-delta-btn')) {
+				const btn = target.closest('.ds-plan-delta-btn') as HTMLElement;
+				const pType = (btn?.getAttribute('data-plan-type') as any) || 'dissertation';
+				this.runAIPlanningDelta(pType === 'prospectus' ? 'prospectus' : 'dissertation');
+				return;
+			}
+			const btn = target.closest('.ds-resume-btn');
+			if (!btn) return;
+			const wrapper = btn.closest('.ds-resume-card-wrapper, .ds-resume-card') as HTMLElement | null;
+			if (!wrapper) return;
+			const filePath = wrapper.getAttribute('data-file');
+			const lineStr = wrapper.getAttribute('data-line');
+			if (!filePath) return;
+			// @ts-ignore
+			await this.app.workspace.openLinkText(filePath, '/', false);
+			if (lineStr) {
+				setTimeout(() => {
+					// @ts-ignore
+					const leaf = this.app.workspace.activeLeaf;
+					if (leaf && (leaf as any).view && (leaf as any).view.editor) {
+						(leaf as any).view.editor.setCursor({ line: parseInt(lineStr, 10), ch: 0 });
+					}
+				}, 160);
+			}
+			new Notice('🎯 Resumed where you left off');
+		};
+		this.registerDomEvent(document, 'click', delegated);
+
+		// Delegated events for task board interactions
+		const taskDelegate = (ev: Event) => {
+			const target = ev.target as HTMLElement;
+			if (!target) return;
+			// Status cycle button
+			const statusBtn = target.closest('.ds-task-status-btn');
+			if (statusBtn) {
+				const card = statusBtn.closest('.ds-task-card') as HTMLElement | null;
+				if (!card) return;
+				const id = card.getAttribute('data-id');
+				if (!id) return;
+				const list = this.ensureTodayTaskList();
+				const task = list.find(t => t.id === id);
+				if (!task) return;
+				const order: MicroTaskStatus[] = ['todo','doing','done'];
+				const next = order[(order.indexOf(task.status) + 1) % order.length];
+				task.status = next;
+				task.updated = Date.now();
+				this.saveDailyTasks();
+				card.dataset.status = next;
+				card.classList.remove('status-todo','status-doing','status-done');
+				card.classList.add(`status-${next}`);
+				return;
+			}
+			// Add task button
+			const addBtn = target.closest('.ds-task-add-btn');
+			if (addBtn) {
+				new AddMicroTaskModal(this.app, this, (text) => {
+					if (!text.trim()) return;
+					this.createMicroTask(text.trim());
+					this.upsertTaskBoardInDailyNote(true);
+				}).open();
+			}
+		};
+		this.registerDomEvent(document, 'click', taskDelegate);
+
+		// Drag and drop handlers
+		let dragId: string | null = null;
+		const dragStart = (ev: DragEvent) => {
+			const card = (ev.target as HTMLElement)?.closest('.ds-task-card') as HTMLElement | null;
+			if (!card) return; 
+			dragId = card.getAttribute('data-id');
+			ev.dataTransfer?.setData('text/plain', dragId || '');
+		};
+		const dragOver = (ev: DragEvent) => {
+			if (!(ev.target instanceof HTMLElement)) return;
+			const overCard = ev.target.closest('.ds-task-card');
+			if (!overCard) return;
+			ev.preventDefault();
+		};
+		const drop = (ev: DragEvent) => {
+			if (!dragId) return;
+			if (!(ev.target instanceof HTMLElement)) return;
+			const targetCard = ev.target.closest('.ds-task-card') as HTMLElement | null;
+			if (!targetCard) return;
+			const targetId = targetCard.getAttribute('data-id');
+			if (!targetId || targetId === dragId) return;
+			const list = this.ensureTodayTaskList();
+			const fromIdx = list.findIndex(t=>t.id===dragId);
+			const toIdx = list.findIndex(t=>t.id===targetId);
+			if (fromIdx === -1 || toIdx === -1) return;
+			const [moved] = list.splice(fromIdx,1);
+			list.splice(toIdx,0,moved);
+			list.forEach((t,i)=> t.order = i);
+			this.saveDailyTasks();
+			this.upsertTaskBoardInDailyNote(false);
+		};
+		this.registerDomEvent(document, 'dragstart', dragStart as any);
+		this.registerDomEvent(document, 'dragover', dragOver as any);
+		this.registerDomEvent(document, 'drop', drop as any);
+
 		console.log('Dissertation Support Plugin loaded');
+
+	}
+
+	/** Capture active editor context and store as lastContext */
+	captureCurrentContext() {
+		try {
+			// Prefer activeLeaf to avoid runtime issues with instanceof
+			// @ts-ignore
+			const leaf = this.app.workspace.activeLeaf;
+			if (!leaf || !leaf.view) {
+				new Notice('No active note to capture');
+				return;
+			}
+			const view: any = leaf.view;
+			if (!view.file || !view.editor) {
+				new Notice('Current view is not a markdown note');
+				return;
+			}
+			const file: TFile = view.file;
+			const editor = view.editor;
+			const cursor = editor.getCursor();
+			const line = cursor?.line ?? 0;
+			const contentLine = editor.getLine(line) || '';
+			let derivedTitle = file.basename;
+			const fileCache = this.app.metadataCache.getFileCache(file);
+			if (fileCache?.headings && fileCache.headings.length > 0) {
+				derivedTitle = fileCache.headings[0].heading;
+			}
+			if (/^#+\s+/.test(contentLine.trim())) {
+				derivedTitle = contentLine.replace(/^#+\s+/, '').trim();
+			}
+			this.settings.lastContext = {
+				title: derivedTitle,
+				filePath: file.path,
+				line,
+				updated: Date.now()
+			};
+			if (!this.settings.featureUsage) this.settings.featureUsage = {};
+			this.settings.featureUsage.savedContext = true;
+			this.saveSettings();
+			console.log('[DissertationSupport] Context saved', this.settings.lastContext);
+			new Notice('✅ Context saved');
+			this.upsertResumeCardInDailyNote();
+		} catch (e) {
+			console.error('[DissertationSupport] capture error', e);
+			new Notice('Failed to save context (see console)');
+		}
+	}
+
+	openLastContext() {
+		if (!this.settings.lastContext) {
+			new Notice('No saved context yet');
+			return;
+		}
+		const ctx = this.settings.lastContext;
+		// @ts-ignore
+		this.app.workspace.openLinkText(ctx.filePath, '/', false).then(() => {
+			setTimeout(() => {
+				// @ts-ignore
+				const leaf = this.app.workspace.activeLeaf;
+				if (leaf && (leaf as any).view && (leaf as any).view.editor) {
+					(leaf as any).view.editor.setCursor({ line: ctx.line, ch: 0 });
+				}
+			}, 160);
+		});
+	}
+
+	initStatusBar() {
+		const item = this.addStatusBarItem();
+		item.addClass('ds-status-bar');
+		const update = () => {
+			let text = '';
+			if (this.settings.lastReminderTime) {
+				const mins = Math.floor((Date.now() - this.settings.lastReminderTime) / 60000);
+				text += `Last nudge: ${mins}m ago`;
+			} else {
+				text += 'No nudges yet';
+			}
+			if (this.settings.lastContext) {
+				text += ' | Resume?';
+				item.addClass('ds-status-resume');
+			} else {
+				item.removeClass('ds-status-resume');
+			}
+			item.setText(text);
+		};
+		item.onClickEvent(() => {
+			if (this.settings.lastContext) this.openLastContext();
+		});
+		update();
+		// periodic refresh
+		this.registerInterval(window.setInterval(update, 60_000));
+	}
+
+	/** Ensure today's micro-task list exists and return it */
+	ensureTodayTaskList(): MicroTask[] {
+		const today = new Date().toISOString().split('T')[0];
+		if (!this.settings.dailyTasks) this.settings.dailyTasks = {};
+		if (!this.settings.dailyTasks[today]) {
+			this.settings.dailyTasks[today] = [];
+			this.saveSettings();
+		}
+		return this.settings.dailyTasks[today];
+	}
+
+	saveDailyTasks() {
+		this.saveSettings();
+	}
+
+	/**
+	 * Create micro-task using ADHD-friendly TaskService
+	 * Maintains backward compatibility with existing code
+	 */
+	createMicroTask(text: string): MicroTask {
+		if (!this.taskService) {
+			// Fallback to old method if service not available
+			return this.createMicroTaskLegacy(text);
+		}
+
+		try {
+			const task = this.taskService.createTask(text);
+			
+			// Track feature usage for onboarding
+			if (!this.settings.featureUsage) this.settings.featureUsage = {};
+			this.settings.featureUsage.createdMicroTask = true;
+			
+			// Auto-save using ADHD-friendly storage service
+			this.saveSettings();
+			
+			return task;
+		} catch (error) {
+			console.error('[Task Creation] Failed:', error);
+			new Notice('❌ Could not create task. ' + (error as Error).message);
+			
+			// Return a mock task to prevent crashes
+			return {
+				id: 'error-' + Date.now(),
+				text: text.trim(),
+				status: 'todo' as MicroTaskStatus,
+				order: 0,
+				created: Date.now(),
+				updated: Date.now(),
+			};
+		}
+	}
+
+	/**
+	 * Legacy task creation method for fallback
+	 * ADHD-friendly: Never leave user completely broken
+	 */
+	private createMicroTaskLegacy(text: string): MicroTask {
+		const list = this.ensureTodayTaskList();
+		const today = new Date().toISOString().split('T')[0];
+		const mt: MicroTask = {
+			id: `${today}-${Math.random().toString(36).slice(2,8)}`,
+			text: text.trim(),
+			status: 'todo',
+			order: list.length,
+			created: Date.now(),
+			updated: Date.now()
+		};
+		list.push(mt);
+		if (!this.settings.featureUsage) this.settings.featureUsage = {};
+		this.settings.featureUsage.createdMicroTask = true;
+		this.saveDailyTasks();
+		return mt;
+	}
+
+	private extractMicroTasksFromContent(content: string, max: number = 8): string[] {
+		// Heuristic: capture bullet lines that start with - or * and have 6-120 chars
+		const lines = content.split(/\r?\n/);
+		const tasks: string[] = [];
+		for (const line of lines) {
+			const m = line.match(/^\s*[-*+]\s+(.{6,120})$/);
+			if (m) {
+				const txt = m[1].trim();
+				// skip headings disguised or very long / section labels
+				if (/^#+/.test(txt) || /\bchapter\b/i.test(txt)) continue;
+				if (txt.length > 5 && tasks.indexOf(txt) === -1) tasks.push(txt);
+			}
+			if (tasks.length >= max) break;
+		}
+		return tasks;
+	}
+
+	/**
+	 * Seed micro-tasks from last plan using ADHD-friendly TaskService
+	 * Maintains backward compatibility with existing code
+	 */
+	async seedMicroTasksFromLastPlan() {
+		if (!this.settings.lastPlans || Object.keys(this.settings.lastPlans).length === 0) {
+			new Notice('No stored plan metadata yet. Generate a plan first.');
+			return;
+		}
+
+		// Prefer dissertation then prospectus
+		const meta = this.settings.lastPlans['dissertation'] || this.settings.lastPlans['prospectus'];
+		if (!meta) { 
+			new Notice('No plan available for seeding'); 
+			return; 
+		}
+
+		if (!this.taskService) {
+			// Fallback to legacy method
+			await this.seedMicroTasksFromLastPlanLegacy(meta);
+			return;
+		}
+
+		try {
+			// Use TaskService's built-in seed functionality
+			const result = await this.taskService.seedTasksFromPlan(meta.file, 8);
+			
+			// Update task board in daily note
+			await this.upsertTaskBoardInDailyNote(true);
+			
+			// Track feature usage
+			if (!this.settings.featureUsage) this.settings.featureUsage = {};
+			this.settings.featureUsage.seededFromPlan = true;
+			this.saveSettings();
+			
+			new Notice(`✅ Seeded ${result.added} micro task${result.added!==1?'s':''}`);
+			
+		} catch (error) {
+			console.error('[Task Seeding] Failed:', error);
+			new Notice('❌ Could not seed tasks. ' + (error as Error).message);
+			
+			// Try fallback method
+			await this.seedMicroTasksFromLastPlanLegacy(meta);
+		}
+	}
+
+	/**
+	 * Legacy task seeding method for fallback
+	 * ADHD-friendly: Never leave user completely broken
+	 */
+	private async seedMicroTasksFromLastPlanLegacy(meta: any) {
+		try {
+			const file = this.app.vault.getAbstractFileByPath(meta.file) as TFile | null;
+			if (!file) { 
+				new Notice('Plan file not found'); 
+				return; 
+			}
+			
+			const content = await this.app.vault.read(file);
+			const extracted = this.extractMicroTasksFromContent(content, 8);
+			
+			if (!extracted.length) { 
+				new Notice('No suitable bullet tasks found'); 
+				return; 
+			}
+			
+			let added = 0;
+			extracted.forEach(t => { this.createMicroTask(t); added++; });
+			await this.upsertTaskBoardInDailyNote(true);
+			
+			if (!this.settings.featureUsage) this.settings.featureUsage = {};
+			this.settings.featureUsage.seededFromPlan = true;
+			this.saveSettings();
+			
+			new Notice(`✅ Seeded ${added} micro task${added!==1?'s':''} (legacy mode)`);
+		} catch (error) {
+			console.error('[Legacy Task Seeding] Failed:', error);
+			new Notice('❌ Could not seed tasks from plan');
+		}
+	}
+
+	/** Ensure a daily plan exists for today; generate if missing or stale */
+	ensureTodayPlan() {
+		const today = new Date().toISOString().split('T')[0];
+		if (this.settings.lastDailyPlan?.date === today) return;
+		this.settings.lastDailyPlan = this.generateDailyPlan(today);
+		this.saveSettings();
+		// also ensure today's task board placeholder exists
+		this.upsertTaskBoardInDailyNote(false).catch(err => console.warn('Task board upsert (init) failed', err));
+	}
+
+	/** Generate up to 3 gentle micro-suggestions */
+	generateDailyPlan(date: string) {
+		const baseSuggestions: string[] = [];
+		// Seed suggestions from context title words if available
+		if (this.settings.lastContext) {
+			baseSuggestions.push(`Open the note: ${this.settings.lastContext.title}`);
+			baseSuggestions.push('Skim last 3 paragraphs');
+			baseSuggestions.push('Clarify one sentence');
+		} else {
+			baseSuggestions.push('Open main dissertation outline');
+			baseSuggestions.push('Write a single sentence');
+			baseSuggestions.push('List 2 sub-questions');
+		}
+		const suggestions = baseSuggestions.slice(0, 3).map((text, i) => ({ id: `${date}-${i}`, text, done: false }));
+		return {
+			date,
+			suggestions,
+			firstAction: '',
+			stopPoint: '',
+			created: Date.now(),
+			lastUpdated: Date.now()
+		};
+	}
+
+	/** Placeholder: open focus panel modal (implemented later) */
+	showFocusPanel() {
+		if (!this.settings.lastDailyPlan) this.ensureTodayPlan();
+		const modal = new FocusPanelModal(this.app, this);
+		modal.open();
+		if (!this.settings.featureUsage) this.settings.featureUsage = {};
+		this.settings.featureUsage.openedFocusPanel = true;
+		this.saveSettings();
 	}
 
 	onunload() {
@@ -64,10 +687,95 @@ export default class DissertationSupportPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// Migration: ensure dailyTasks exists
+		if (!this.settings.dailyTasks) this.settings.dailyTasks = {};
+		if (this.settings.prospectusDeadline === undefined) this.settings.prospectusDeadline = '';
+		if (this.settings.planOutputFolder === undefined) this.settings.planOutputFolder = '';
+		if (this.settings.lastPlans === undefined) this.settings.lastPlans = {};
+		// Tips migrations
+		if (this.settings.tipsEnabled === undefined) this.settings.tipsEnabled = true;
+		if (this.settings.tipsDismissed === undefined) this.settings.tipsDismissed = false;
+		if (this.settings.lastTipDate === undefined) this.settings.lastTipDate = '';
+		if (this.settings.nextTipIndex === undefined) this.settings.nextTipIndex = 0;
+		if (!this.settings.featureUsage) this.settings.featureUsage = {};
+		if (!this.settings.tipFrequency) this.settings.tipFrequency = 'daily';
+
+		// Initialize ADHD-friendly services with dependency injection
+		await this.initializeServices();
+	}
+
+	/**
+	 * Initialize all ADHD-friendly services with proper dependency injection
+	 * Services are designed for graceful degradation and fast feedback
+	 */
+	private async initializeServices(): Promise<void> {
+		try {
+			// StorageService: Handles debounced saves and never-fail persistence
+			this.storageService = new StorageService(this);
+
+			// TaskService: ADHD-friendly micro-task management (≤12 tasks/day)
+			this.taskService = new TaskService(this.app, this.settings.dailyTasks || {}, {
+				maxTasksPerDay: 12, // ADHD-friendly limit
+				showEmptyState: true,
+				autoArchiveCompleted: false, // Keep for satisfaction review
+				enableDragDrop: true,
+			});
+
+			// AIService: Fallback-ready AI with timeout handling
+			const aiProvider: AIProvider = {
+				name: this.settings.openaiApiKey ? 'openai' : 'local',
+				apiKey: this.settings.openaiApiKey,
+				maxTokens: 2000,
+				temperature: 0.7,
+			};
+			
+			this.aiService = new AIService({
+				defaultProvider: aiProvider,
+				retryAttempts: 3,
+				timeoutMs: 30000,
+				enableLogging: true,
+			});
+
+			// PlanningService: ADHD-friendly micro-task planning
+			this.planningService = new PlanningService(this.app, this.aiService);
+
+			console.log('[ADHD Services] All services initialized successfully');
+
+		} catch (error) {
+			console.error('[ADHD Services] Service initialization failed:', error);
+			new Notice('⚠️ Some features may be limited. Check console for details.');
+			
+			// Graceful degradation - create minimal services
+			await this.initializeMinimalServices();
+		}
+	}
+
+	/**
+	 * Fallback initialization when main services fail
+	 * ADHD-friendly: Never leave user without basic functionality
+	 */
+	private async initializeMinimalServices(): Promise<void> {
+		try {
+			this.taskService = new TaskService(this.app, {}, { maxTasksPerDay: 5 });
+			console.log('[ADHD Services] Minimal services initialized');
+		} catch (error) {
+			console.error('[ADHD Services] Even minimal initialization failed:', error);
+		}
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+		// Use ADHD-friendly storage service if available, otherwise fallback
+		if (this.storageService) {
+			const { settings: validatedSettings } = validateSettings(this.settings);
+			await this.storageService.saveSettings(validatedSettings);
+		} else {
+			await this.saveData(this.settings);
+		}
+		
+		// Sync task data if TaskService is available
+		if (this.taskService) {
+			this.settings.dailyTasks = this.taskService.getTasksData();
+		}
 	}
 
 	startProactiveReminders() {
@@ -91,6 +799,9 @@ export default class DissertationSupportPlugin extends Plugin {
 
 	toggleReminders() {
 		this.settings.isReminderActive = !this.settings.isReminderActive;
+		this.saveSettings();
+		if (!this.settings.featureUsage) this.settings.featureUsage = {};
+		this.settings.featureUsage.toggledReminders = true;
 		this.saveSettings();
 		
 		if (this.settings.isReminderActive) {
@@ -136,47 +847,370 @@ export default class DissertationSupportPlugin extends Plugin {
 		modal.open();
 	}
 
-	async runAIPlanning() {
+	// ---------- Onboarding Tips (Enhanced) ----------
+	private getOnboardingTips(): { text: string; condition?: (p: DissertationSupportPlugin)=>boolean }[] {
+		return [
+			{ text: 'Use "Save Current Dissertation Context" before stopping – resume instantly later.', condition: p => !p.settings.featureUsage?.savedContext },
+			{ text: 'Break work into ≤ 25 min micro tasks. Use "Add Micro Task" to capture one.', condition: p => !p.settings.featureUsage?.createdMicroTask },
+			{ text: 'Open a generated plan then click "Seed top bullets as micro tasks" to populate today\'s board.', condition: p => (p.settings.featureUsage?.createdPlan && !p.settings.featureUsage?.seededFromPlan) },
+			{ text: 'Generate a dissertation or prospectus plan with AI to scaffold structure.', condition: p => !p.settings.featureUsage?.createdPlan },
+			{ text: 'Click "Generate delta update" inside a plan to get concise changes & next steps.', condition: p => p.settings.featureUsage?.createdPlan && !p.settings.featureUsage?.createdDelta },
+			{ text: 'Open "Show Today\'s Focus Panel" and set a first action + planned stop—helps reduce friction.', condition: p => !p.settings.featureUsage?.openedFocusPanel },
+			{ text: 'Insert the Resume Card into today\'s note after saving context to jump back instantly.', condition: p => p.settings.featureUsage?.savedContext && p.settings.notionStyleEnabled },
+			{ text: 'Set a Plan Output Folder in settings to keep AI plans organized.', condition: p => !p.settings.planOutputFolder },
+			{ text: 'Adjust the Reminder Interval or pause reminders if nudges feel too frequent.', condition: p => !p.settings.featureUsage?.toggledReminders },
+			{ text: 'Use a separate Prospectus deadline to shape early-stage scoping.', condition: p => !p.settings.prospectusDeadline },
+			{ text: 'Toggle the Notion-like style in settings if you prefer simpler visuals.' },
+		];
+	}
+
+	showNextOnboardingTip(auto: boolean = false) {
+		if (!this.settings.tipsEnabled || this.settings.tipsDismissed) return;
+		const today = new Date().toISOString().split('T')[0];
+		// frequency gating
+		if (auto) {
+			if (this.settings.tipFrequency === 'daily' && this.settings.lastTipDate === today) return;
+			if (this.settings.tipFrequency === 'manual') return; // never auto show
+		}
+		const all = this.getOnboardingTips();
+		// Filter by condition (keep those whose condition passes or no condition)
+		let pool = all.filter(t => !t.condition || t.condition(this));
+		if (!pool.length) pool = all; // fallback to full set
+		let idx = this.settings.nextTipIndex || 0;
+		if (idx >= pool.length) idx = 0;
+		const tipObj = pool[idx];
+		new OnboardingTipModal(this.app, this, tipObj.text, idx, pool.length).open();
+		this.settings.lastTipDate = today;
+		this.settings.nextTipIndex = (idx + 1) % pool.length;
+		this.saveSettings();
+	}
+
+	disableOnboardingTips(permanent: boolean = true) {
+		this.settings.tipsEnabled = false;
+		if (permanent) this.settings.tipsDismissed = true;
+		this.saveSettings();
+	}
+
+	resetOnboardingTips() {
+		this.settings.nextTipIndex = 0;
+		this.settings.lastTipDate = '';
+		this.settings.tipsDismissed = false;
+		this.settings.tipsEnabled = true;
+		this.saveSettings();
+		new Notice('🔄 Tips progress reset');
+	}
+
+	/** Insert or update the resume card in today's daily note (YYYY-MM-DD).md */
+	async upsertResumeCardInDailyNote() {
+		if (!this.settings.lastContext) {
+			new Notice('No saved context yet. Save context first.');
+			return;
+		}
+		const today = new Date().toISOString().split('T')[0];
+		const dailyFileName = `${today}.md`;
+		let file = this.app.vault.getAbstractFileByPath(dailyFileName) as TFile | null;
+		if (!file) {
+			await this.app.vault.create(dailyFileName, `# ${today}\n\n`);
+			file = this.app.vault.getAbstractFileByPath(dailyFileName) as TFile | null;
+		}
+		if (!file) {
+			new Notice('Could not create or access daily note');
+			return;
+		}
+		const content = await this.app.vault.read(file);
+		const markerStart = '<!-- ds-resume-card:start -->';
+		const markerEnd = '<!-- ds-resume-card:end -->';
+
+		const elapsedMins = Math.max(1, Math.floor((Date.now() - this.settings.lastContext.updated) / 60000));
+		const humanAgo = elapsedMins < 60 ? `${elapsedMins}m ago` : `${Math.floor(elapsedMins / 60)}h ago`;
+		const cardMarkdown = `${markerStart}\n\n<div class=\"ds-resume-card-wrapper ds-enter\" data-file=\"${this.settings.lastContext.filePath}\" data-line=\"${this.settings.lastContext.line}\">\n  <div class=\"ds-resume-header\"><span class=\"ds-pulse-indicator\"></span><span>Resume Focus</span></div>\n  <div class=\"ds-resume-title\">${this.settings.lastContext.title}</div>\n  <div class=\"ds-resume-meta\">Last worked: ${humanAgo} • <a href=\"${this.settings.lastContext.filePath}\">Open note</a></div>\n  <div><button class=\"ds-resume-btn\" aria-label=\"Resume work at saved context\">Continue here →</button></div>\n  <div class=\"ds-resume-footer\">Gentle restart • No pressure</div>\n</div>\n\n${markerEnd}`;
+
+		let newContent: string;
+		if (content.includes(markerStart) && content.includes(markerEnd)) {
+			newContent = content.replace(new RegExp(markerStart + '[\s\S]*?' + markerEnd), cardMarkdown);
+		} else {
+			// Insert near top after first heading
+			const lines = content.split('\n');
+			let insertIndex = 0;
+			if (lines.length > 0 && /^# /.test(lines[0])) insertIndex = 1; // after top heading
+			lines.splice(insertIndex, 0, cardMarkdown, '');
+			newContent = lines.join('\n');
+		}
+		await this.app.vault.modify(file, newContent);
+		new Notice('✅ Resume card updated in daily note');
+		// After resume card update, also keep task board present (non-intrusive)
+		this.upsertTaskBoardInDailyNote(true).catch(()=>{});
+	}
+
+	/** 
+	 * Insert or update the micro task board block in today's daily note
+	 * Uses ADHD-friendly TaskService for consistent rendering
+	 */
+	async upsertTaskBoardInDailyNote(showNotice: boolean = false) {
+		if (!this.taskService) {
+			// Fallback to legacy method
+			await this.upsertTaskBoardInDailyNoteLegacy(showNotice);
+			return;
+		}
+
+		try {
+			// Use TaskService's built-in daily note integration
+			await this.taskService.upsertTaskBoardInDailyNote(undefined, showNotice);
+			
+			if (showNotice) {
+				new Notice('✅ Task board updated');
+			}
+		} catch (error) {
+			console.error('[Task Board] Update failed:', error);
+			
+			// Fallback to legacy method
+			await this.upsertTaskBoardInDailyNoteLegacy(showNotice);
+		}
+	}
+
+	/**
+	 * Legacy task board update method for fallback
+	 * ADHD-friendly: Never leave user completely broken
+	 */
+	private async upsertTaskBoardInDailyNoteLegacy(showNotice: boolean = false) {
+		try {
+			const today = new Date().toISOString().split('T')[0];
+			const dailyFileName = `${today}.md`;
+			let file = this.app.vault.getAbstractFileByPath(dailyFileName) as TFile | null;
+			
+			if (!file) {
+				await this.app.vault.create(dailyFileName, `# ${today}\n\n`);
+				file = this.app.vault.getAbstractFileByPath(dailyFileName) as TFile | null;
+			}
+			if (!file) return;
+			
+			const content = await this.app.vault.read(file);
+			const markerStart = '<!-- ds-task-board:start -->';
+			const markerEnd = '<!-- ds-task-board:end -->';
+			
+			const list = this.ensureTodayTaskList().sort((a,b)=> a.order - b.order);
+			const cardsHtml = list.map(t => {
+				const statusClass = `status-${t.status}`;
+				return `<div class=\"ds-task-card ${statusClass}\" data-id=\"${t.id}\" draggable=\"true\" data-status=\"${t.status}\">`+
+				`<button class=\"ds-task-status-btn\" aria-label=\"Cycle status\"></button>`+
+				`<div class=\"ds-task-text\">${escapeHtml(t.text)}</div>`+
+				`</div>`;
+			}).join('\n');
+			
+			const emptyState = `<div class=\"ds-task-empty\">Add a micro-task (≤ 25 min) to make starting easy.</div>`;
+			const addBtn = `<button class=\"ds-task-add-btn\" aria-label=\"Add micro task\">＋ Task</button>`;
+			const boardHtml = `${markerStart}\n<div class=\"ds-task-board-wrapper ds-enter\">\n  <div class=\"ds-task-board-header\">Today's Micro Tasks ${addBtn}</div>\n  <div class=\"ds-task-board\">${cardsHtml || emptyState}</div>\n  <div class=\"ds-task-hint\">Statuses: grey = todo • blue = doing • green = done</div>\n</div>\n${markerEnd}`;
+			
+			let newContent: string;
+			if (content.includes(markerStart) && content.includes(markerEnd)) {
+				newContent = content.replace(new RegExp(markerStart + '[\\s\\S]*?' + markerEnd), boardHtml);
+			} else {
+				// Insert after resume card if present else after heading
+				const resumeMarker = '<!-- ds-resume-card:end -->';
+				if (content.includes(resumeMarker)) {
+					newContent = content.replace(resumeMarker, resumeMarker + '\n\n' + boardHtml + '\n');
+				} else {
+					const lines = content.split('\n');
+					let insertIndex = 0;
+					if (lines.length > 0 && /^# /.test(lines[0])) insertIndex = 1;
+					lines.splice(insertIndex, 0, boardHtml, '');
+					newContent = lines.join('\n');
+				}
+			}
+			
+			await this.app.vault.modify(file, newContent);
+			
+			if (showNotice) {
+				new Notice('✅ Task board updated (legacy mode)');
+			}
+		} catch (error) {
+			console.error('[Legacy Task Board] Update failed:', error);
+			if (showNotice) {
+				new Notice('❌ Could not update task board');
+			}
+		}
+	}
+
+	/**
+	 * Generate AI plan using ADHD-friendly PlanningService
+	 * Maintains backward compatibility with existing code
+	 */
+	async runAIPlanning(planType: 'dissertation' | 'prospectus') {
 		if (!this.settings.openaiApiKey) {
 			new Notice('❌ Please set your OpenAI API key in settings first');
 			return;
 		}
-
 		if (!this.settings.dissertationTopic) {
 			new Notice('❌ Please set your dissertation topic in settings first');
 			return;
 		}
 
-		new Notice('🤖 Generating dissertation plan with AI...');
+		const label = planType === 'prospectus' ? 'prospectus' : 'dissertation';
+		new Notice(`🤖 Generating ${label} plan with AI...`);
+
+		if (!this.planningService || !this.aiService) {
+			// Fallback to legacy method
+			await this.runAIPlanningLegacy(planType);
+			return;
+		}
 
 		try {
-			const plan = await this.generateDissertationPlan();
-			await this.createPlanFile(plan);
-			new Notice('✅ Dissertation plan created! Check your vault for the new files.');
+			// Use PlanningService's ADHD-friendly planning
+			const planConfig = {
+				topic: this.settings.dissertationTopic,
+				planType: planType,
+				deadline: planType === 'prospectus' ? this.settings.prospectusDeadline : this.settings.deadline,
+				targetWordCount: this.settings.targetWordCount,
+				outputFolder: this.settings.planOutputFolder,
+			};
+
+			const result = await this.planningService.generatePlan(planConfig);
+			
+			// Track feature usage
+			if (!this.settings.featureUsage) this.settings.featureUsage = {};
+			this.settings.featureUsage.createdPlan = true;
+			this.saveSettings();
+			
+			new Notice(`✅ ${planType === 'prospectus' ? 'Prospectus' : 'Dissertation'} plan created!`);
+			
 		} catch (error) {
-			console.error('AI Planning error:', error);
+			console.error('[AI Planning] Failed:', error);
+			new Notice('❌ Failed to generate plan. ' + (error as Error).message);
+			
+			// Try fallback method
+			await this.runAIPlanningLegacy(planType);
+		}
+	}
+
+	/**
+	 * Legacy AI planning method for fallback
+	 * ADHD-friendly: Never leave user completely broken
+	 */
+	private async runAIPlanningLegacy(planType: 'dissertation' | 'prospectus') {
+		try {
+			const plan = await this.generatePlan(planType);
+			await this.createPlanFile(planType, plan);
+			
+			if (!this.settings.featureUsage) this.settings.featureUsage = {};
+			this.settings.featureUsage.createdPlan = true;
+			this.saveSettings();
+			
+			new Notice(`✅ ${planType === 'prospectus' ? 'Prospectus' : 'Dissertation'} plan created (legacy mode)!`);
+		} catch (error) {
+			console.error('[Legacy AI Planning] Failed:', error);
 			new Notice('❌ Failed to generate plan. Check your API key and try again.');
 		}
 	}
 
-	async generateDissertationPlan(): Promise<string> {
-		const prompt = `I'm working on a dissertation about "${this.settings.dissertationTopic}" with a deadline of ${this.settings.deadline || 'not specified'}. 
+	async runAIPlanningDelta(planType: 'dissertation' | 'prospectus') {
+		if (!this.settings.openaiApiKey || !this.settings.dissertationTopic) {
+			new Notice('❌ Missing API key or topic');
+			return;
+		}
+		const last = this.settings.lastPlans?.[planType];
+		if (!last) {
+			new Notice('No previous plan found; generating fresh.');
+			return this.runAIPlanning(planType);
+		}
+		new Notice('🤖 Generating delta plan (changes & next micro steps)...');
+		try {
+			const basePrompt = this.buildPlanPrompt(planType);
+			const deltaPrompt = basePrompt + `\n\nYou previously generated a plan stored in file: ${last.file} on ${last.created}. Produce a DELTA UPDATE focusing on: 1) Adjusted timeline (if days remaining changed), 2) Top 5 next micro tasks, 3) Any risk shifts, 4) A concise recap table. Keep it short (< 800 tokens).`;
+			const system = 'You provide concise delta updates to an existing structured academic plan, focusing only on what changed and immediate next actions.';
+			const response = await fetch('https://api.openai.com/v1/chat/completions', {
+				method: 'POST',
+				headers: { 'Authorization': `Bearer ${this.settings.openaiApiKey}`, 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					model: 'gpt-4',
+					messages: [
+						{ role: 'system', content: system },
+						{ role: 'user', content: deltaPrompt }
+					],
+					max_tokens: 900,
+					temperature: 0.5
+				})
+			});
+			if (!response.ok) throw new Error('API error');
+			const data = await response.json();
+			const deltaContent = data.choices[0].message.content;
+			const today = new Date().toISOString().split('T')[0];
+			const fileName = `${planType === 'prospectus' ? 'Prospectus' : 'Dissertation'} Plan Delta - ${today}.md`;
+			const folder = (this.settings.planOutputFolder || '').trim();
+			let fullPath = fileName;
+			if (folder) { await this.ensureFolderExists(folder); fullPath = `${folder.replace(/\/$/, '')}/${fileName}`; }
+			await this.safeCreateFile(fullPath, `# ${planType === 'prospectus' ? 'Prospectus' : 'Dissertation'} Plan Delta (${today})\n\n${deltaContent}`);
+			if (!this.settings.lastPlans) this.settings.lastPlans = {};
+			this.settings.lastPlans[planType] = { file: fullPath, created: today, daysRemaining: this.settings.lastPlans[planType]?.daysRemaining ?? null };
+			await this.saveSettings();
+			if (!this.settings.featureUsage) this.settings.featureUsage = {};
+			this.settings.featureUsage.createdDelta = true;
+			this.saveSettings();
+			new Notice('✅ Delta plan created');
+		} catch (e) {
+			console.error(e);
+			new Notice('❌ Delta plan failed');
+		}
+	}
 
-I have ADHD and struggle with:
-- Task initiation (starting work)
-- Breaking large projects into manageable pieces  
-- Maintaining focus on abstract academic work
-- Remembering what I was working on when I stopped
+	private buildPlanPrompt(planType: 'dissertation' | 'prospectus'): string {
+		const topic = this.settings.dissertationTopic || 'not specified';
+		const deadlineRaw = planType === 'prospectus' ? this.settings.prospectusDeadline : this.settings.deadline;
+		let timelineMeta = 'No specific deadline provided.';
+		let daysRemaining: number | null = null;
+		let weeksRemaining: number | null = null;
+		if (deadlineRaw) {
+			const parsed = new Date(deadlineRaw);
+			if (!isNaN(parsed.getTime())) {
+				const now = new Date();
+				const diffMs = parsed.getTime() - now.getTime();
+				if (diffMs > 0) {
+					daysRemaining = Math.ceil(diffMs / 86400000);
+					weeksRemaining = Math.ceil(daysRemaining / 7);
+					timelineMeta = `${daysRemaining} days (~${weeksRemaining} weeks) remain until the deadline (${deadlineRaw}). Provide a realistic weekly milestone ladder that de-risks slippage.`;
+				} else {
+					timelineMeta = `Deadline date (${deadlineRaw}) appears in the past; treat as needing rapid triage scaffolding.`;
+				}
+			}
+		}
+		const focusLabel = planType === 'prospectus' ? 'prospectus' : 'dissertation';
+		const sections = planType === 'prospectus'
+			? '1. Required prospectus sections (title page, abstract (if needed), introduction / background, problem statement, purpose, research questions/hypotheses, significance, literature review scaffold, proposed methodology, expected contributions).'
+			: '1. Major chapters/sections (Introduction, Literature Review, Methods, Results, Discussion, Conclusion, Appendices).';
+		const wordTarget = this.settings.targetWordCount;
+		const pacingLine = wordTarget ? `Total target length ~${wordTarget.toLocaleString()} words. Provide rough word allocation per major section (percent + est words).` : 'No explicit word target provided; focus on structural clarity.';
+		return `I am preparing a ${focusLabel} about "${topic}".
+Deadline context: ${timelineMeta}
 
-Please create a structured dissertation plan with:
-1. Major chapters/sections breakdown
-2. Specific, concrete micro-tasks for each section (not vague goals)
-3. Realistic timeline suggestions
-4. Daily action items that are small enough to start easily
-5. Context preservation notes for each section
+${pacingLine}
 
-Format as markdown with clear headings and actionable tasks.`;
+Neurodivergent constraints (ADHD):
+- Task initiation friction
+- Working memory volatility / context loss between sessions
+- Need concrete micro actions (5–25 min) instead of vague goals
+- Risk of over-planning paralysis
 
+Please generate a structured ${focusLabel} plan with:
+${sections}
+2. For each section: concrete micro-tasks (5–25 min granularity) that move it forward.
+3. A timeline mapping weeks (${weeksRemaining ?? 'N/A'} if numeric) to high-level deliverables; front-load clarity tasks (outline, scoping) early. If word target given, include weekly cumulative word range suggestions.
+4. A risk / mitigation list (3–5 items) focused on momentum threats.
+5. Context preservation tips after each major section (what to capture before stopping).
+6. A quick-start list for the next 3 sessions (bullet list, each ≤ 15 min).
+
+Format:
+- Use markdown
+- Top-level heading with plan type and topic
+- Include a summary table (Section | Key Outputs | Est. Micro Tasks)
+- Timeline as a markdown table if possible
+
+Keep tone encouraging, neutral, non-judgmental.`;
+	}
+
+	async generatePlan(planType: 'dissertation' | 'prospectus'): Promise<string> {
+		const prompt = this.buildPlanPrompt(planType);
+		const system = planType === 'prospectus'
+			? 'You are an expert academic advisor helping students craft rigorous yet manageable dissertation prospectus documents. Emphasize scope clarity and early risk reduction.'
+			: 'You are an expert academic advisor specializing in helping ADHD students complete dissertations. Focus on breaking down complex academic work into specific, actionable micro-tasks.';
 		const response = await fetch('https://api.openai.com/v1/chat/completions', {
 			method: 'POST',
 			headers: {
@@ -186,52 +1220,78 @@ Format as markdown with clear headings and actionable tasks.`;
 			body: JSON.stringify({
 				model: 'gpt-4',
 				messages: [
-					{
-						role: 'system',
-						content: 'You are an expert academic advisor specializing in helping ADHD students complete dissertations. Focus on breaking down complex academic work into specific, actionable micro-tasks.'
-					},
-					{
-						role: 'user',
-						content: prompt
-					}
+					{ role: 'system', content: system },
+					{ role: 'user', content: prompt }
 				],
-				max_tokens: 2000,
+				max_tokens: 2500,
 				temperature: 0.7
 			})
 		});
-
-		if (!response.ok) {
-			throw new Error(`OpenAI API error: ${response.status}`);
-		}
-
+		if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
 		const data = await response.json();
 		return data.choices[0].message.content;
 	}
 
-	async createPlanFile(plan: string) {
+	async createPlanFile(planType: 'dissertation' | 'prospectus', plan: string) {
 		const today = new Date().toISOString().split('T')[0];
-		const fileName = `Dissertation Plan - ${today}.md`;
-		
-		const frontmatter = `---
-created: ${today}
-topic: "${this.settings.dissertationTopic}"
-deadline: "${this.settings.deadline}"
-type: dissertation-plan
----
+		const isProspectus = planType === 'prospectus';
+		const deadline = isProspectus ? this.settings.prospectusDeadline : this.settings.deadline;
+		let daysRemaining: number | null = null;
+		if (deadline) {
+			const d = new Date(deadline);
+			if (!isNaN(d.getTime())) {
+				const diff = d.getTime() - Date.now();
+				if (diff > 0) daysRemaining = Math.ceil(diff / 86400000);
+			}
+		}
+		const baseName = `${isProspectus ? 'Prospectus' : 'Dissertation'} Plan - ${today}.md`;
+		const folder = (this.settings.planOutputFolder || '').trim();
+		let filePath = baseName;
+		if (folder) {
+			// ensure folder exists (nested supported)
+			await this.ensureFolderExists(folder);
+			filePath = `${folder.replace(/\/$/, '')}/${baseName}`;
+		}
+		const actionsBlock = `\n<div class="ds-plan-actions">\n  <button class="ds-plan-seed-btn" data-plan-type="${planType}">Seed top bullets as micro tasks →</button>\n  <button class="ds-plan-delta-btn" data-plan-type="${planType}">Generate delta update</button>\n</div>\n`;
+		const frontmatter = `---\ncreated: ${today}\nplanType: ${planType}\ntopic: "${this.settings.dissertationTopic}"\n${isProspectus ? 'prospectusDeadline' : 'deadline'}: "${deadline || ''}"\ndaysRemaining: ${daysRemaining ?? 'null'}\noutputFolder: "${folder}"\n---\n\n# ${isProspectus ? 'Prospectus' : 'Dissertation'} Plan: ${this.settings.dissertationTopic}\n\nGenerated on: ${today}\n${deadline ? `Target ${isProspectus ? 'Prospectus' : 'Dissertation'} Deadline: ${deadline}` : 'No deadline specified'}\n\n${plan}${actionsBlock}\n---\n*Generated by AI – refine and adapt based on advisor feedback and evolving clarity.*\n`;
+		await this.safeCreateFile(filePath, frontmatter);
+		// Record metadata
+		if (!this.settings.lastPlans) this.settings.lastPlans = {};
+		this.settings.lastPlans[planType] = { file: filePath, created: today, daysRemaining };
+		await this.saveSettings();
+	}
 
-# Dissertation Plan: ${this.settings.dissertationTopic}
+	private async ensureFolderExists(path: string) {
+		const parts = path.split('/').filter(Boolean);
+		let current = '';
+		for (const part of parts) {
+			current = current ? `${current}/${part}` : part;
+			// @ts-ignore
+			if (!this.app.vault.getAbstractFileByPath(current)) {
+				// @ts-ignore
+				await this.app.vault.createFolder(current).catch(()=>{});
+			}
+		}
+	}
 
-Generated on: ${today}
-Deadline: ${this.settings.deadline || 'Not specified'}
-
-${plan}
-
----
-
-*This plan was generated by AI to help with ADHD-friendly dissertation management. Adjust as needed based on your progress and changing requirements.*
-`;
-
-		await this.app.vault.create(fileName, frontmatter);
+	private async safeCreateFile(path: string, content: string) {
+		// @ts-ignore
+		const existing = this.app.vault.getAbstractFileByPath(path);
+		if (existing) {
+			// append suffix to avoid overwrite
+			const extIndex = path.lastIndexOf('.');
+			const base = extIndex === -1 ? path : path.substring(0, extIndex);
+			const ext = extIndex === -1 ? '' : path.substring(extIndex);
+			let i = 1;
+			let candidate = `${base} (${i})${ext}`;
+			// @ts-ignore
+			while (this.app.vault.getAbstractFileByPath(candidate)) {
+				i++; candidate = `${base} (${i})${ext}`;
+			}
+			path = candidate;
+		}
+		await this.app.vault.create(path, content);
+		return path;
 	}
 }
 
@@ -261,7 +1321,7 @@ class QuickStartModal extends Modal {
 		});
 		planButton.onclick = () => {
 			this.close();
-			this.plugin.runAIPlanning();
+			this.plugin.runAIPlanning('dissertation');
 		};
 
 		const settingsButton = quickActions.createEl('button', { 
@@ -288,6 +1348,109 @@ class QuickStartModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 	}
+}
+
+class FocusPanelModal extends Modal {
+	plugin: DissertationSupportPlugin;
+
+	constructor(app: App, plugin: DissertationSupportPlugin) {
+		super(app);
+		this.plugin = plugin;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('ds-focus-modal');
+		const plan = this.plugin.settings.lastDailyPlan;
+		if (!plan) {
+			contentEl.createEl('p', { text: 'No plan available.' });
+			return;
+		}
+		contentEl.createEl('h2', { text: "Today's Focus" });
+		const suggestionsContainer = contentEl.createDiv({ cls: 'ds-focus-suggestions' });
+		plan.suggestions.forEach(s => {
+			const row = suggestionsContainer.createDiv({ cls: 'ds-focus-suggestion' });
+			const checkbox = row.createEl('input', { type: 'checkbox' });
+			checkbox.checked = s.done;
+			checkbox.addEventListener('change', () => {
+				s.done = checkbox.checked;
+				plan.lastUpdated = Date.now();
+				this.plugin.saveSettings();
+				row.toggleClass('is-done', s.done);
+			});
+			const label = row.createEl('span', { text: s.text });
+		});
+		// First action input
+		const firstActionWrap = contentEl.createDiv({ cls: 'ds-focus-field' });
+		firstActionWrap.createEl('label', { text: "What I'll do first" });
+		const firstInput = firstActionWrap.createEl('input', { type: 'text', value: plan.firstAction });
+		firstInput.placeholder = 'e.g., Outline subsection on methods';
+		firstInput.addEventListener('blur', () => {
+			plan.firstAction = firstInput.value.trim();
+			plan.lastUpdated = Date.now();
+			this.plugin.saveSettings();
+		});
+		// Stop point input
+		const stopWrap = contentEl.createDiv({ cls: 'ds-focus-field' });
+		stopWrap.createEl('label', { text: 'Planned stop point' });
+		const stopInput = stopWrap.createEl('input', { type: 'text', value: plan.stopPoint });
+		stopInput.placeholder = 'e.g., Finish first paragraph';
+		stopInput.addEventListener('blur', () => {
+			plan.stopPoint = stopInput.value.trim();
+			plan.lastUpdated = Date.now();
+			this.plugin.saveSettings();
+		});
+
+		const footer = contentEl.createDiv({ cls: 'ds-focus-footer' });
+		const closeBtn = footer.createEl('button', { text: 'Close' });
+		closeBtn.addEventListener('click', () => this.close());
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
+}
+
+class AddMicroTaskModal extends Modal {
+	plugin: DissertationSupportPlugin;
+	onSubmit: (text: string) => void;
+
+	constructor(app: App, plugin: DissertationSupportPlugin, onSubmit: (text: string)=>void) {
+		super(app);
+		this.plugin = plugin;
+		this.onSubmit = onSubmit;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('ds-focus-modal');
+		contentEl.createEl('h2', { text: 'New Micro Task' });
+		const wrap = contentEl.createDiv({ cls: 'ds-focus-field' });
+		wrap.createEl('label', { text: 'Describe a tiny action (≤ 25 min)' });
+		const input = wrap.createEl('textarea');
+		(input as HTMLTextAreaElement).rows = 3;
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+				this.submit(input as HTMLTextAreaElement);
+			}
+		});
+		const footer = contentEl.createDiv({ cls: 'ds-focus-footer' });
+		const addBtn = footer.createEl('button', { text: 'Add' });
+		addBtn.addEventListener('click', () => this.submit(input as HTMLTextAreaElement));
+		const cancel = footer.createEl('button', { text: 'Cancel' });
+		cancel.addEventListener('click', () => this.close());
+	}
+
+	submit(input: HTMLTextAreaElement) {
+		const value = input.value.trim();
+		if (!value) { new Notice('Enter a tiny actionable task'); return; }
+		this.onSubmit(value);
+		this.close();
+	}
+
+	onClose() { this.contentEl.empty(); }
 }
 
 class DissertationSettingTab extends PluginSettingTab {
@@ -353,6 +1516,40 @@ class DissertationSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName('Prospectus Deadline')
+			.setDesc('Optional separate deadline for prospectus stage planning')
+			.addText(text => text
+				.setPlaceholder('e.g., "2025-01-15"')
+				.setValue(this.plugin.settings.prospectusDeadline || '')
+				.onChange(async (value) => {
+					this.plugin.settings.prospectusDeadline = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Plan Output Folder')
+			.setDesc('Optional: relative folder path to store generated plan files (leave blank for vault root)')
+			.addText(text => text
+				.setPlaceholder('e.g., Plans/Dissertation')
+				.setValue(this.plugin.settings.planOutputFolder || '')
+				.onChange(async (value) => {
+					this.plugin.settings.planOutputFolder = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Target Word Count')
+			.setDesc('Optional total dissertation target word count to shape pacing assumptions')
+			.addText(text => text
+				.setPlaceholder('e.g., 60000')
+				.setValue(this.plugin.settings.targetWordCount ? String(this.plugin.settings.targetWordCount) : '')
+				.onChange(async (value) => {
+					const num = parseInt(value, 10);
+					this.plugin.settings.targetWordCount = isNaN(num) ? undefined : num;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
 			.setName('Proactive Reminders')
 			.setDesc('Enable proactive reminders to work on your dissertation')
 			.addToggle(toggle => toggle
@@ -367,5 +1564,103 @@ class DissertationSettingTab extends PluginSettingTab {
 						this.plugin.stopProactiveReminders();
 					}
 				}));
+
+		new Setting(containerEl)
+			.setName('Notion-like visual style')
+			.setDesc('Enable enhanced minimal “Notion” style for resume card and future UI components')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.notionStyleEnabled)
+				.onChange(async (value) => {
+					this.plugin.settings.notionStyleEnabled = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Onboarding tips')
+			.setDesc('Rotating lightweight hints (auto based on frequency)')
+			.addToggle(t => t
+				.setValue(this.plugin.settings.tipsEnabled && !this.plugin.settings.tipsDismissed)
+				.onChange(async v => {
+					this.plugin.settings.tipsEnabled = v;
+					if (!v) this.plugin.settings.tipsDismissed = true;
+					await this.plugin.saveSettings();
+				}))
+			.addDropdown(d => {
+				d.addOption('daily','Daily');
+				d.addOption('every-launch','Every launch');
+				d.addOption('manual','Manual only');
+				d.setValue(this.plugin.settings.tipFrequency || 'daily');
+				d.onChange(async v => { this.plugin.settings.tipFrequency = v as any; await this.plugin.saveSettings(); });
+			})
+			.addButton(b => b.setButtonText('Show tip now')
+				.onClick(() => this.plugin.showNextOnboardingTip(false)))
+			.addButton(b => b.setButtonText('Reset tips')
+				.onClick(() => this.plugin.resetOnboardingTips()));
+
+		new Setting(containerEl)
+			.setName('Reset feature usage flags')
+			.setDesc('Clear recorded usage so conditional tips start fresh')
+			.addButton(b => b.setButtonText('Reset usage')
+				.onClick(async () => { this.plugin.settings.featureUsage = {}; await this.plugin.saveSettings(); new Notice('Usage flags reset'); }));
+
+		new Setting(containerEl)
+			.setName('Disable tips permanently')
+			.setDesc('Turn off all onboarding tips (can reset later)')
+			.addButton(b => b.setWarning().setButtonText('Disable')
+				.onClick(() => { this.plugin.disableOnboardingTips(true); new Notice('🛑 Tips disabled'); this.display(); }));
 	}
+}
+
+class OnboardingTipModal extends Modal {
+	private plugin: DissertationSupportPlugin;
+	private tip: string;
+	private index: number;
+	private total: number;
+
+	constructor(app: App, plugin: DissertationSupportPlugin, tip: string, index: number, total: number) {
+		super(app);
+		this.plugin = plugin;
+		this.tip = tip;
+		this.index = index;
+		this.total = total;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass('ds-focus-modal');
+		contentEl.createEl('h2', { text: `💡 Tip ${this.index + 1}/${this.total}` });
+		const p = contentEl.createDiv();
+		p.addClass('ds-tip-text');
+		// very light markdown: **bold**, `code`
+		let html = this.tip
+			.replace(/`([^`]+)`/g, '<code>$1</code>')
+			.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+		p.innerHTML = html;
+		const hint = contentEl.createDiv({ cls: 'ds-tip-hint' });
+		hint.setText('Use command palette: "Show Onboarding Tip" anytime.');
+		const footer = contentEl.createDiv({ cls: 'ds-focus-footer' });
+		const nextBtn = footer.createEl('button', { text: 'Next tip' });
+		nextBtn.addEventListener('click', () => { this.close(); this.plugin.showNextOnboardingTip(false); });
+		const dismissBtn = footer.createEl('button', { text: 'Dismiss' });
+		dismissBtn.addEventListener('click', () => this.close());
+		const disableBtn = footer.createEl('button', { text: 'Turn off tips' });
+		disableBtn.addEventListener('click', () => { this.plugin.disableOnboardingTips(true); this.close(); new Notice('Tips turned off'); });
+	}
+
+	onClose() { this.contentEl.empty(); }
+}
+
+// --- Utilities ---
+function escapeHtml(str: string): string {
+	return str.replace(/[&<>"']/g, (ch) => {
+		switch (ch) {
+			case '&': return '&amp;';
+			case '<': return '&lt;';
+			case '>': return '&gt;';
+			case '"': return '&quot;';
+			case "'": return '&#39;';
+			default: return ch;
+		}
+	});
 }
