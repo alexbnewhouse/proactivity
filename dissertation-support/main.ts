@@ -6,6 +6,7 @@ import { AIService, AIProvider } from './src/ai-service';
 import { PlanningService } from './src/planning-service';
 import { TaskService } from './src/task-service';
 import { ProjectDialogueService } from './src/project-dialogue-service';
+import { AcademicTemplateService } from './src/academic-templates';
 import { validateSettings, Settings as ValidatedSettings } from './src/settings-schema';
 
 interface LastContext {
@@ -110,6 +111,7 @@ export default class DissertationSupportPlugin extends Plugin {
 	private planningService: PlanningService;
 	private taskService: TaskService;
 	private projectDialogueService: ProjectDialogueService;
+	private academicTemplateService: AcademicTemplateService;
 
 	async onload() {
 		await this.loadSettings();
@@ -785,8 +787,11 @@ export default class DissertationSupportPlugin extends Plugin {
 			// PlanningService: ADHD-friendly micro-task planning
 			this.planningService = new PlanningService(this.app, this.aiService);
 
+			// AcademicTemplateService: ADHD-friendly academic project templates
+			this.academicTemplateService = new AcademicTemplateService();
+
 			// ProjectDialogueService: AI-driven project initiation dialogue
-			this.projectDialogueService = new ProjectDialogueService(this.aiService, this.taskService);
+			this.projectDialogueService = new ProjectDialogueService(this.aiService, this.taskService, this.academicTemplateService);
 
 			console.log('[ADHD Services] All services initialized successfully');
 
@@ -1880,9 +1885,81 @@ class ProjectDialogueModal extends Modal {
 	private async completeDialogue(): Promise<void> {
 		if (!this.currentSession) return;
 
+		// First, show template options if available
+		const templates = this.dialogueService.getSuggestedTemplates(this.currentSession.id);
+		
+		if (templates.length > 0) {
+			this.questionContainer.empty();
+			this.questionContainer.createEl('h3', { text: '📋 Choose a Template (Optional)' });
+			this.questionContainer.createDiv({ 
+				text: 'We found a template that matches your project. Would you like to use it for a structured start?',
+				cls: 'ds-template-intro'
+			});
+
+			const templateContainer = this.questionContainer.createDiv({ cls: 'ds-template-options' });
+			
+			// Template option
+			const template = templates[0]; // Use the first suggested template
+			const templateCard = templateContainer.createDiv({ cls: 'ds-template-card' });
+			templateCard.createEl('h4', { text: template.name });
+			templateCard.createDiv({ text: template.description, cls: 'ds-template-description' });
+			templateCard.createDiv({ 
+				text: `${template.phases.length} phases • ~${template.estimatedWeeks} weeks • ${template.energyProfile} energy`,
+				cls: 'ds-template-meta'
+			});
+
+			// Action buttons
+			const buttonContainer = this.questionContainer.createDiv({ cls: 'ds-button-container' });
+			
+			const useTemplateBtn = buttonContainer.createEl('button', {
+				text: `Use ${template.name} Template`,
+				cls: 'ds-submit-button'
+			});
+			
+			const skipTemplateBtn = buttonContainer.createEl('button', {
+				text: 'Skip Template',
+				cls: 'ds-secondary-button'
+			});
+
+			useTemplateBtn.addEventListener('click', async () => {
+				await this.generatePlanWithTemplate(template.id);
+			});
+
+			skipTemplateBtn.addEventListener('click', async () => {
+				await this.generatePlanWithoutTemplate();
+			});
+		} else {
+			await this.generatePlanWithoutTemplate();
+		}
+	}
+
+	private async generatePlanWithTemplate(templateId: string): Promise<void> {
 		this.questionContainer.empty();
 		this.questionContainer.createDiv({ 
-			text: 'Great! Generating your project plan...',
+			text: '🎯 Generating your structured project plan...',
+			cls: 'ds-generating'
+		});
+
+		try {
+			const plan = await this.dialogueService.applyTemplateToProject(this.currentSession.id, templateId);
+			await this.onComplete(plan);
+			this.close();
+		} catch (error) {
+			console.error('[Project Dialogue] Failed to generate template plan:', error);
+			this.questionContainer.empty();
+			this.questionContainer.createEl('p', { 
+				text: 'Sorry, there was an error generating your template plan. Falling back to custom plan.',
+				cls: 'ds-error'
+			});
+			// Fall back to regular plan generation
+			setTimeout(() => this.generatePlanWithoutTemplate(), 2000);
+		}
+	}
+
+	private async generatePlanWithoutTemplate(): Promise<void> {
+		this.questionContainer.empty();
+		this.questionContainer.createDiv({ 
+			text: 'Great! Generating your custom project plan...',
 			cls: 'ds-generating'
 		});
 

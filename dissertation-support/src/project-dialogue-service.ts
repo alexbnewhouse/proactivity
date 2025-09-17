@@ -11,6 +11,7 @@
 
 import { AIService } from './ai-service';
 import { TaskService } from './task-service';
+import { AcademicTemplateService, AcademicTemplate } from './academic-templates';
 
 export interface ProjectContext {
   type: 'dissertation' | 'paper' | 'proposal' | 'chapter' | 'other';
@@ -66,11 +67,13 @@ export interface ProjectPhase {
 export class ProjectDialogueService {
   private aiService: AIService;
   private taskService: TaskService;
+  private academicTemplateService: AcademicTemplateService;
   private activeSessions: Map<string, DialogueSession> = new Map();
 
-  constructor(aiService: AIService, taskService: TaskService) {
+  constructor(aiService: AIService, taskService: TaskService, academicTemplateService?: AcademicTemplateService) {
     this.aiService = aiService;
     this.taskService = taskService;
+    this.academicTemplateService = academicTemplateService || new AcademicTemplateService();
   }
 
   /**
@@ -447,5 +450,95 @@ ${responses}`;
       estimatedTimeline: 'Will refine as we progress',
       confidence: 'low',
     };
+  }
+
+  /**
+   * Get suggested academic templates based on project context
+   * ADHD-friendly: Templates provide structure when planning feels overwhelming
+   */
+  getSuggestedTemplates(sessionId: string): AcademicTemplate[] {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return [];
+
+    const { type } = session.projectContext;
+    
+    // Map dialogue project types to template types
+    const templateTypeMap: Record<string, string> = {
+      'dissertation': 'dissertation',
+      'paper': 'research-paper',
+      'proposal': 'research-proposal',
+      'chapter': 'dissertation-chapter',
+      'other': 'research-paper', // Default fallback
+    };
+
+    const templateType = templateTypeMap[type] || 'research-paper';
+    const template = this.academicTemplateService.getTemplate(templateType);
+    
+    return template ? [template] : [];
+  }
+
+  /**
+   * Apply a template to create an enhanced project plan
+   * ADHD-friendly: Structured breakdown with time estimates and energy levels
+   */
+  async applyTemplateToProject(sessionId: string, templateType: string): Promise<ProjectPlan> {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      throw new Error('Dialogue session not found');
+    }
+
+    const template = this.academicTemplateService.getTemplate(templateType);
+    if (!template) {
+      throw new Error(`Template ${templateType} not found`);
+    }
+
+    // Convert template to micro-tasks using the academic template service
+    const microTasks = this.academicTemplateService.templateToMicroTasks(template);
+    
+    // Create project plan from template
+    const projectPlan: ProjectPlan = {
+      title: session.projectContext.title || template.name,
+      phases: template.phases.map(phase => ({
+        name: phase.name,
+        description: phase.description,
+        estimatedWeeks: Math.ceil(phase.estimatedDays / 7), // Convert days to weeks
+        tasks: phase.tasks.map(task => task.title),
+        dependencies: [], // ProjectPhase dependencies (different from task dependencies)
+      })),
+      immediateNextSteps: microTasks.slice(0, 5).map(task => task.text),
+      potentialRisks: [
+        'Perfectionism leading to delays',
+        'Losing momentum between phases',
+        'Underestimating time requirements',
+        ...(template.adhdTips.slice(0, 2))
+      ],
+      estimatedTimeline: `${template.phases.length} phases over ${template.estimatedWeeks} weeks`,
+      confidence: 'medium' as const,
+    };
+
+    return projectPlan;
+  }
+
+  /**
+   * Get template-based micro-tasks for immediate action
+   * ADHD-friendly: Break overwhelming template into today's actionable steps
+   */
+  getTemplateStarterTasks(templateType: string, limit: number = 3): Array<{
+    title: string;
+    description: string;
+    estimatedMinutes: number;
+    energyLevel: 'low' | 'medium' | 'high';
+  }> {
+    const template = this.academicTemplateService.getTemplate(templateType);
+    if (!template) return [];
+
+    const microTasks = this.academicTemplateService.templateToMicroTasks(template);
+    
+    return microTasks.slice(0, limit).map(task => ({
+      title: task.text || 'Task', // MicroTask uses 'text' property
+      description: task.text || '',
+      estimatedMinutes: (task as any).estimatedMinutes || 25, // Added as metadata by template
+      energyLevel: ((task as any).energyLevel === 'moderate' ? 'medium' : (task as any).energyLevel) || 'medium',
+    }));
   }
 }

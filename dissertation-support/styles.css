@@ -504,3 +504,66 @@ body.theme-dark .ds-resume-btn {
   font-size: 0.9rem;
 }
 
+/* Template Selection Styles */
+.ds-template-intro {
+  margin-bottom: 20px;
+  color: var(--ds-text-muted-color);
+  text-align: center;
+}
+
+.ds-template-options {
+  margin-bottom: 30px;
+}
+
+.ds-template-card {
+  border: 2px solid var(--ds-border-color);
+  border-radius: var(--ds-radius-md);
+  padding: 20px;
+  margin-bottom: 15px;
+  background: var(--ds-bg-active);
+  transition: border-color var(--ds-transition), box-shadow var(--ds-transition);
+}
+
+.ds-template-card:hover {
+  border-color: var(--ds-accent-blue);
+  box-shadow: 0 4px 12px rgba(91, 141, 239, 0.1);
+}
+
+.ds-template-card h4 {
+  margin: 0 0 8px 0;
+  color: var(--ds-text-color);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.ds-template-description {
+  color: var(--ds-text-muted-color);
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.ds-template-meta {
+  color: var(--ds-accent-blue);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.ds-secondary-button {
+  background: transparent;
+  border: 2px solid var(--ds-border-color);
+  color: var(--ds-text-muted-color);
+  padding: 12px 24px;
+  border-radius: var(--ds-radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all var(--ds-transition);
+  margin-left: 10px;
+}
+
+.ds-secondary-button:hover:not(:disabled) {
+  border-color: var(--ds-text-color);
+  color: var(--ds-text-color);
+  transform: translateY(-1px);
+}
+
